@@ -268,11 +268,11 @@ export default function App() {
     return items;
   }, [data, currentCategory, searchQuery]);
 
-  const getFavicon = (soft) => {
+  const getDomain = (soft) => {
     let domain = '';
     try { if (soft.website) domain = new URL(soft.website).hostname; } catch(e){}
     if (!domain && soft.downloadUrls?.[0]) try { domain = new URL(soft.downloadUrls[0]).hostname; } catch(e){}
-    return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+    return domain;
   };
 
   return (
@@ -381,7 +381,10 @@ export default function App() {
             <SortableContext items={displayedItems.map(i => i.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
                 {displayedItems.map(soft => {
-                    const iconUrl = getFavicon(soft);
+                    const domain = getDomain(soft);
+                    const proxyUrl = domain ? `/api/favicon?domain=${domain}` : null;
+                    const googleUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+                    
                     const firstChar = soft.name.charAt(0).toUpperCase();
                     // 修复：如果当前是"全部软件"或"搜索结果"，禁用拖拽属性 (disabled={true})
                     const isDragDisabled = currentCategory === 'all' || !!searchQuery;
@@ -391,7 +394,25 @@ export default function App() {
                             <div className="group bg-white p-5 rounded-xl border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all duration-200 relative flex flex-col h-full select-none">
                                 <div className="flex justify-between items-start mb-3" onClick={() => { setEditingSoft(soft); setModals({...modals, software: true}); }}>
                                     <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800 font-bold text-lg overflow-hidden group-hover:scale-110 transition-transform duration-300">
-                                        {iconUrl ? <img src={iconUrl} loading="lazy" alt={soft.name} className="w-full h-full object-contain p-1" onError={(e)=>{e.target.onerror=null; e.target.src=''; e.target.parentElement.innerText=firstChar}} /> : firstChar}
+                                        {domain ? (
+                                            <img 
+                                                src={proxyUrl} 
+                                                loading="lazy" 
+                                                alt={soft.name} 
+                                                className="w-full h-full object-contain p-1" 
+                                                onError={(e) => {
+                                                    // 第一次失败：如果当前是代理地址，降级到 Google 直连
+                                                    if (e.target.src.includes('/api/favicon')) {
+                                                        e.target.src = googleUrl;
+                                                    } else {
+                                                        // 第二次失败（Google 也挂了）：降级到文字
+                                                        e.target.onerror = null; 
+                                                        e.target.style.display = 'none'; 
+                                                        e.target.parentElement.innerText = firstChar;
+                                                    }
+                                                }} 
+                                            />
+                                        ) : firstChar}
                                     </div>
                                     <span className="text-[10px] px-2 py-0.5 bg-gray-50 text-gray-400 rounded-full font-medium tracking-wide group-hover:bg-gray-100 transition-colors">{soft._catName}</span>
                                 </div>
