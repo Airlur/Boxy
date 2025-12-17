@@ -14,7 +14,7 @@ export function SortableItem({ id, children, className, disabled }) {
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 50 : 'auto',
     position: 'relative',
-    touchAction: 'none'
+    touchAction: 'pan-y'
   };
 
   return (

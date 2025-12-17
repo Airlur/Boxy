@@ -4,7 +4,7 @@ import {
   PlusSquare, Upload, Download, Cloud, ExternalLink, Ghost, 
   AlertCircle, CheckCircle, RotateCw, Menu, Globe, BookOpen 
 } from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 
 import { initialData } from './data/initialData';
@@ -211,9 +211,10 @@ export default function App() {
   };
 
 
-  // --- 拖放 ---
+  // --- Drag & Drop ---
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
