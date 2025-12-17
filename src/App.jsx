@@ -25,14 +25,14 @@ export default function App() {
   const [editingSoft, setEditingSoft] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
   
-  // WebDAV Config
+  // WebDAV 配置
   const [wdConfig, setWdConfig] = useState({ url: '', user: '', pass: '', remember: false, autoSync: false });
   const [isSyncing, setIsSyncing] = useState(false);
   
   // Toast
   const [toast, setToast] = useState(null);
 
-  // Debounce Timer Ref for Auto-Sync
+  // 自动同步的去抖动定时器参考
   const autoSyncTimer = useRef(null);
 
   // --- Helpers ---
@@ -48,7 +48,7 @@ export default function App() {
     return domain;
   };
 
-  // --- Core Data Logic ---
+  // --- 核心数据逻辑 ---
   
   // 统一保存入口：更新 State -> 更新 LocalStorage -> (可选) 触发自动同步
   const saveData = (newData, skipAutoSync = false) => {
@@ -58,21 +58,21 @@ export default function App() {
     setData(dataWithTs);
     localStorage.setItem('boxy_data', JSON.stringify(dataWithTs));
 
-    // Auto-Sync Logic
+    // 自动同步逻辑
     if (!skipAutoSync && wdConfig.autoSync && wdConfig.url) {
         if (autoSyncTimer.current) clearTimeout(autoSyncTimer.current);
         
         // 防抖 2秒：用户停止操作2秒后，自动推送
         autoSyncTimer.current = setTimeout(() => {
-            console.log('Triggering Auto-Sync Push...');
+            console.log('正在触发自动同步推送...');
             handleWebDav('push', dataWithTs, true); 
         }, 2000);
     }
   };
 
-  // --- Initialization ---
+  // --- 初始化 ---
   useEffect(() => {
-    // 1. Load Local Data
+    // 1. 加载本地数据
     const local = localStorage.getItem('boxy_data');
     let currentLocalData = initialData;
     if (local) {
@@ -82,7 +82,7 @@ export default function App() {
       } catch (e) { showToast('本地数据损坏', 'error'); }
     }
 
-    // 2. Load WebDAV Config & Auto Pull
+    // 2. 加载 WebDAV 配置并自动拉取
     const savedWd = localStorage.getItem('boxy_webdav_config');
     if (savedWd) {
         const config = JSON.parse(savedWd);
@@ -94,7 +94,7 @@ export default function App() {
         }
     }
 
-    // Keyboard Shortcuts
+    // 键盘快捷键
     const handleKeyDown = (e) => {
         if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyE')) {
             e.preventDefault();
@@ -105,7 +105,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Save WebDAV Config when changed
+  // 更改后保存 WebDAV 配置
   useEffect(() => {
     if (wdConfig.remember) {
         localStorage.setItem('boxy_webdav_config', JSON.stringify(wdConfig));
@@ -115,7 +115,7 @@ export default function App() {
   }, [wdConfig]);
 
 
-  // --- WebDAV Operations ---
+  // --- WebDAV 操作 ---
   
   /**
    * @param {'push'|'pull'} type 
@@ -187,17 +187,17 @@ export default function App() {
 
         // 智能合并策略：如果云端数据更新，才覆盖
         if (cloudTs > localTs) {
-            saveData(cloudData, true); // skip auto-sync to avoid loop
+            saveData(cloudData, true); // 跳过自动同步以避免循环
             if (!silent) showToast('已同步云端最新数据');
-            else console.log('Auto-Pull: Local data updated from cloud.');
+            else console.log('自动拉取：本地数据已从云端更新。');
         } else {
             if (!silent) showToast('本地数据已是最新');
-            else console.log('Auto-Pull: Local data is up to date.');
+            else console.log('自动拉取：本地数据已是最新状态。');
         }
       } else {
         // Push Success
         if (!silent) showToast('推送成功');
-        else console.log('Auto-Push: Success.');
+        else console.log('自动推送: 成功。');
       }
       
       if (!silent) setModals(prev => ({ ...prev, webdav: false }));
@@ -211,7 +211,7 @@ export default function App() {
   };
 
 
-  // --- Drag & Drop ---
+  // --- 拖放 ---
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -221,7 +221,7 @@ export default function App() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    // 1. Categories
+    // 1. 类别
     const isCategoryDrag = data.categories.some(c => c.id === active.id);
     if (isCategoryDrag) {
         const oldIndex = data.categories.findIndex(c => c.id === active.id);
@@ -231,7 +231,7 @@ export default function App() {
         return;
     } 
     
-    // 2. Software
+    // 2. 软件卡片
     if (currentCategory === 'all' || searchQuery) return;
     
     const catIndex = data.categories.findIndex(c => c.id === currentCategory);
@@ -249,9 +249,9 @@ export default function App() {
     }
   };
 
-  // --- Event Handlers ---
+  // --- 事件处理 ---
   
-  // Save Software (Add/Edit)
+  // 保存软件（添加/编辑）
   const handleSaveSoftware = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -280,7 +280,7 @@ export default function App() {
         });
     }
     
-    // Add to new category
+    // 添加到新类别
     const targetCat = newCats.find(c => c.id === fd.get('categoryId'));
     if(targetCat) {
         targetCat.software.push(newSoft);
@@ -293,7 +293,7 @@ export default function App() {
     showToast('保存成功');
   };
 
-  // Delete Software
+  // 删除软件
   const handleDeleteSoftware = () => {
     if(!confirm('确认删除？') || !editingSoft) return;
     let newCats = [...data.categories];
@@ -305,7 +305,7 @@ export default function App() {
     showToast('已删除');
   };
 
-  // Save Category
+  // 保存分类
   const handleSaveCategory = (name) => {
       if(editingCat) { 
           saveData({...data, categories: data.categories.map(c => c.id === editingCat.id ? {...c, name} : c)}); 
@@ -316,7 +316,7 @@ export default function App() {
   };
 
 
-  // --- Data Calculations ---
+  // --- 数据计算 ---
   const countTotal = () => data.categories.reduce((acc, c) => acc + c.software.length, 0);
 
   const displayedItems = useMemo(() => {
