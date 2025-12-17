@@ -36,9 +36,7 @@ function SortableItem({ id, children, className, disabled }) {
 // --- 辅助组件：动态链接输入 ---
 function LinksInput({ id, label, initialValues = [] }) {
     const [links, setLinks] = useState(initialValues.length ? initialValues : ['']);
-    // 监听外部重置（当切换软件时）
-    useEffect(() => { setLinks(initialValues.length ? initialValues : ['']) }, [initialValues]);
-
+    
     return (
         <div>
             <div className="flex items-center justify-between mb-2">
@@ -188,21 +186,14 @@ export default function App() {
     e.preventDefault();
     const fd = new FormData(e.target);
     
-    // 获取动态链接 (通过 name 属性获取数组)
-    // 注意：React 中直接操作 DOM 获取 array input 比较 tricky，这里我们用 LinksInput 组件生成的 hidden input 或直接查询 DOM
-    const getLinks = (containerId) => {
-        const container = document.getElementById(containerId);
-        if(!container) return [];
-        return Array.from(container.querySelectorAll('input')).map(i => i.value.trim()).filter(Boolean);
-    };
-
     const newSoft = {
       id: fd.get('id') || 's_' + Date.now(),
       name: fd.get('name'),
       website: fd.get('website'),
       description: fd.get('description'),
-      downloadUrls: getLinks('dl-inputs'),
-      blogUrls: getLinks('blog-inputs'),
+      // 使用 FormData.getAll 获取数组数据，移除 DOM 操作
+      downloadUrls: fd.getAll('dl-inputs[]').map(v => v.trim()).filter(Boolean),
+      blogUrls: fd.getAll('blog-inputs[]').map(v => v.trim()).filter(Boolean),
       sort: 999
     };
 
@@ -409,10 +400,10 @@ export default function App() {
                                     <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{soft.description}</p>
                                 </div>
                                 <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50 group-hover:border-gray-100 transition-colors">
-                                    <button disabled={!soft.downloadUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.downloadUrls[0], '_blank'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.downloadUrls?.[0] ? '快速下载' : '无链接'}>
+                                    <button disabled={!soft.downloadUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.downloadUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.downloadUrls?.[0] ? '快速下载' : '无链接'}>
                                         <Download size={14} /> <span className="font-medium">{soft.downloadUrls?.length || 0}</span>
                                     </button>
-                                    <button disabled={!soft.blogUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.blogUrls[0], '_blank'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 px-2 py-1 rounded hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.blogUrls?.[0] ? '查看教程' : '无链接'}>
+                                    <button disabled={!soft.blogUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.blogUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 px-2 py-1 rounded hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.blogUrls?.[0] ? '查看教程' : '无链接'}>
                                         <ExternalLink size={14} /> <span className="font-medium">{soft.blogUrls?.length || 0}</span>
                                     </button>
                                 </div>
