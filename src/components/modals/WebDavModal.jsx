@@ -70,10 +70,10 @@ export function WebDavModal({ config, setConfig, onSync, onClose }) {
 
                     <div className="grid grid-cols-2 gap-3 mt-4">
                         <button onClick={() => onSync('pull')} className="flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
-                            <CloudDownload size={16} className="text-blue-600"/> 强制拉取
+                            <CloudDownload size={16} className="text-blue-600"/> 立即拉取
                         </button>
                         <button onClick={() => onSync('push')} className="flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">
-                            <CloudUpload size={16}/> 强制推送
+                            <CloudUpload size={16}/> 立即推送
                         </button>
                     </div>
                 </div>

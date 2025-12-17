@@ -134,36 +134,54 @@ export default function App() {
     let url = config.url.replace(/\/+$/, '');
     if (!url.endsWith('/Boxy')) url += '/Boxy';
     const targetEndpoint = url + '/boxy_data.json';
+    const folderEndpoint = url; // 用于 MKCOL 创建文件夹
 
     if (!silent) showToast(type === 'push' ? '正在上传...' : '正在下载...', 'info');
     setIsSyncing(true);
 
-    try {
-      const res = await fetch('/api/webdav', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: targetEndpoint,
-          username: config.user,
-          password: config.pass,
-          method: type === 'push' ? 'PUT' : 'GET',
-          data: type === 'push' ? currentData : undefined
-        })
-      });
+    const doRequest = async (method, endpoint, bodyData) => {
+        const res = await fetch('/api/webdav', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                endpoint,
+                username: config.user,
+                password: config.pass,
+                method,
+                data: bodyData
+            })
+        });
+        const json = await res.json().catch(() => ({})); // 防止非 JSON 响应报错
+        return { ok: res.ok, status: res.status, statusText: res.statusText, json };
+    };
 
-      const result = await res.json();
-      
-      // Handle 404 on Pull (First time user)
+    try {
+      let res = await doRequest(type === 'push' ? 'PUT' : 'GET', targetEndpoint, type === 'push' ? currentData : undefined);
+
+      // --- 自动创建文件夹逻辑 ---
+      // 增加 403 判断：某些 WebDAV (如 Teracloud) 对不存在的父目录 PUT 会报 403
+      if (type === 'push' && (res.status === 403 || res.status === 404 || res.status === 409)) {
+          if (!silent) console.log(`上传失败 (${res.status})，尝试创建 Boxy 目录...`);
+          // 尝试创建目录
+          const mkcolRes = await doRequest('MKCOL', folderEndpoint);
+          
+          if (mkcolRes.ok || mkcolRes.status === 405) { // 201 Created 或 405 Allowed (已存在)
+              // 重试上传
+              res = await doRequest('PUT', targetEndpoint, currentData);
+          }
+      }
+      // -----------------------
+
       if (type === 'pull' && res.status === 404) {
          if(!silent) showToast('云端暂无数据，请先推送', 'info');
          setIsSyncing(false);
          return;
       }
 
-      if (!res.ok) throw new Error(result.error || res.statusText);
+      if (!res.ok) throw new Error(res.json?.error || res.statusText);
 
       if (type === 'pull') {
-        const cloudData = result;
+        const cloudData = res.json;
         const localTs = currentData.updatedAt || 0;
         const cloudTs = cloudData.updatedAt || 0;
 
@@ -178,7 +196,7 @@ export default function App() {
         }
       } else {
         // Push Success
-        if (!silent) showToast('✅ 推送成功');
+        if (!silent) showToast('推送成功');
         else console.log('Auto-Push: Success.');
       }
       

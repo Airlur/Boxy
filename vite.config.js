@@ -15,12 +15,17 @@ const localWebDavProxy = () => ({
           const { endpoint, username, password, method = 'GET', data } = JSON.parse(body);
           
           // 在 Node 环境下发起请求
+          // 伪装成 Chrome 浏览器
+          const cleanHeaders = {
+            'Authorization': 'Basic ' + Buffer.from(username + ':' + password).toString('base64'),
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*'
+          };
+
           const response = await fetch(endpoint, {
             method,
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(username + ':' + password).toString('base64'),
-              'Content-Type': 'application/json'
-            },
+            headers: cleanHeaders,
             body: method === 'PUT' ? JSON.stringify(data) : undefined
           });
 
