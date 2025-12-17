@@ -64,7 +64,7 @@ export default function App() {
         
         // 防抖 2秒：用户停止操作2秒后，自动推送
         autoSyncTimer.current = setTimeout(() => {
-            console.log('正在触发自动同步推送...');
+            console.log(`[${new Date().toLocaleString()}] 正在触发自动同步推送...`);
             handleWebDav('push', dataWithTs, true); 
         }, 2000);
     }
@@ -161,7 +161,7 @@ export default function App() {
       // --- 自动创建文件夹逻辑 ---
       // 增加 403 判断：某些 WebDAV (如 Teracloud) 对不存在的父目录 PUT 会报 403
       if (type === 'push' && (res.status === 403 || res.status === 404 || res.status === 409)) {
-          if (!silent) console.log(`上传失败 (${res.status})，尝试创建 Boxy 目录...`);
+          if (!silent) console.log(`[${new Date().toLocaleString()}] 上传失败 (${res.status})，尝试创建 Boxy 目录...`);
           // 尝试创建目录
           const mkcolRes = await doRequest('MKCOL', folderEndpoint);
           
@@ -189,15 +189,15 @@ export default function App() {
         if (cloudTs > localTs) {
             saveData(cloudData, true); // 跳过自动同步以避免循环
             if (!silent) showToast('已同步云端最新数据');
-            else console.log('自动拉取：本地数据已从云端更新。');
+            else console.log(`[${new Date().toLocaleString()}] 自动拉取：本地数据已从云端更新。`);
         } else {
             if (!silent) showToast('本地数据已是最新');
-            else console.log('自动拉取：本地数据已是最新状态。');
+            else console.log(`[${new Date().toLocaleString()}] 自动拉取：本地数据已是最新状态。`);
         }
       } else {
         // Push Success
         if (!silent) showToast('推送成功');
-        else console.log('自动推送: 成功。');
+        else console.log(`[${new Date().toLocaleString()}] 自动推送: 成功。`);
       }
       
       if (!silent) setModals(prev => ({ ...prev, webdav: false }));
@@ -261,6 +261,7 @@ export default function App() {
       id: fd.get('id') || 's_' + Date.now(),
       name: fd.get('name'),
       website: fd.get('website'),
+      iconUrl: fd.get('iconUrl'), // 新增字段
       description: fd.get('description'),
       downloadUrls: fd.getAll('dl-inputs[]').map(v => v.trim()).filter(Boolean),
       blogUrls: fd.getAll('blog-inputs[]').map(v => v.trim()).filter(Boolean),
@@ -473,25 +474,34 @@ export default function App() {
                     const firstChar = soft.name.charAt(0).toUpperCase();
                     const isDragDisabled = currentCategory === 'all' || !!searchQuery;
                     
+                    // 优先显示自定义图标，否则使用代理 API
+                    const initialSrc = soft.iconUrl || proxyUrl;
+
                     return (
                         <SortableItem key={soft.id} id={soft.id} className="h-full" disabled={isDragDisabled}>
                             <div className="group bg-white p-5 rounded-xl border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all duration-200 relative flex flex-col h-full select-none">
                                 <div className="flex justify-between items-start mb-3" onClick={() => { setEditingSoft(soft); setModals({...modals, software: true}); }}>
                                     <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800 font-bold text-lg overflow-hidden group-hover:scale-110 transition-transform duration-300">
-                                        {domain ? (
+                                        {initialSrc ? (
                                             <img 
-                                                src={proxyUrl} 
+                                                src={initialSrc} 
                                                 loading="lazy" 
                                                 alt={soft.name} 
                                                 className="w-full h-full object-contain p-1" 
                                                 onError={(e) => {
-                                                    if (e.target.src.includes('/api/favicon')) {
-                                                        e.target.src = googleUrl;
-                                                    } else {
-                                                        e.target.onerror = null; 
-                                                        e.target.style.display = 'none'; 
-                                                        e.target.parentElement.innerText = firstChar;
+                                                    // 1. 如果当前加载失败的是自定义图标，且有域名，降级到代理 API
+                                                    if (soft.iconUrl && e.target.src.includes(soft.iconUrl) && proxyUrl) {
+                                                        e.target.src = proxyUrl;
+                                                        return;
                                                     }
+                                                    // 2. 如果当前是代理 API 失败，降级到 Google
+                                                    if (e.target.src.includes('/api/favicon') && googleUrl) {
+                                                        e.target.src = googleUrl;
+                                                        return;
+                                                    }
+                                                    // 3. 全部失败，显示文字
+                                                    e.target.style.display = 'none'; 
+                                                    e.target.parentElement.innerText = firstChar;
                                                 }} 
                                             />
                                         ) : firstChar}

@@ -20,21 +20,25 @@ export function SoftwareModal({ editingSoft, categories, currentCategory, onSave
                                 <input name="name" required defaultValue={editingSoft?.name} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1.5">官网</label>
-                                <input name="website" defaultValue={editingSoft?.website} placeholder="https://" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1.5">分类</label>
                                 <select name="categoryId" defaultValue={editingSoft ? editingSoft._catId : (currentCategory !== 'all' ? currentCategory : categories[0]?.id)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black">
                                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1.5">描述</label>
-                                <input name="description" defaultValue={editingSoft?.description} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">官网</label>
+                                <input name="website" defaultValue={editingSoft?.website} placeholder="https://" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">图标地址 (可选)</label>
+                                <input name="iconUrl" defaultValue={editingSoft?.iconUrl} placeholder="https://example.com/icon.png" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">描述</label>
+                            <input name="description" defaultValue={editingSoft?.description} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" />
                         </div>
                         <LinksInput id="dl-inputs" label="下载链接" initialValues={editingSoft?.downloadUrls} />
                         <LinksInput id="blog-inputs" label="博客/教程链接" initialValues={editingSoft?.blogUrls} />
