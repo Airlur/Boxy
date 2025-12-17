@@ -1,6 +1,6 @@
 # Boxy - 你的专属应用收藏与管理工具
 
-Boxy 是一款轻量级的个人应用管理工具，旨在帮助你高效地收藏、整理和查找各类软件及应用程序。通过直观的界面和便捷的拖拽操作，你可以轻松管理你的数字资产，并支持 WebDAV 同步，确保数据安全与便捷。
+Boxy 是一款轻量级的个人应用管理导航工具，旨在帮助你高效地收藏、整理和查找各类软件及应用程序。通过直观的界面和便捷的拖拽操作，你可以轻松管理你收藏的宝藏软件，并支持 WebDAV 同步，确保数据安全与便捷。
 
 ## ✨ 主要特性
 
@@ -20,57 +20,65 @@ Boxy 是一款轻量级的个人应用管理工具，旨在帮助你高效地收
 
 ## 🚀 快速开始 (本地开发)
 
-请确保你的本地环境已安装 Node.js (v18+) 和 npm 或 yarn。
+请确保你的本地环境已安装 Node.js (v18+) 和 npm。
 
 1.  **克隆仓库**:
     ```bash
-    git clone https://github.com/your-username/boxy.git
+    git clone https://github.com/Airlur/boxy.git
     cd boxy
     ```
 2.  **安装依赖**:
     ```bash
     npm install
-    # 或者
-    yarn install
     ```
 3.  **启动开发服务器**:
     ```bash
     npm run dev
-    # 或者
-    yarn dev
     ```
-    应用将在 `http://localhost:5173` (或命令行提示的其他端口) 启动。
+4.  **访问服务**
+    打开浏览器访问 http://localhost:3137 。
 
-    **注意**: 在本地 `npm run dev` 环境下，Favicon 的代理 API (`/api/favicon`) 不会被自动模拟。前端会尝试请求该代理 API，失败后会自动降级为直接请求 Google Favicon API。如果你本地开启了代理，则会正常显示图标；如果未开启代理且无法访问 Google，则会显示应用名称的首字母。
+**注意**：在本地 `npm run dev` 环境下，Favicon 的代理 API (`/api/favicon`) 不会被自动模拟。前端会尝试请求该代理 API，失败后会自动降级为直接请求 Google Favicon API。如果你本地开启了代理，则会正常显示图标；如果未开启代理且无法访问 Google，则会显示应用名称的首字母。
 
 ## 部署
 
 Boxy 支持部署到 Vercel 或 Cloudflare Pages 等平台。
 
 ### Vercel
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/your-username/boxy)
+你可以在Vercel上一键部署自己的 Boxy 实例：
 
-1.  确保你的项目已推送到 GitHub/GitLab/Bitbucket 仓库。
-2.  访问 [Vercel](https://vercel.com/) 并使用你的 Git 账户登录。
-3.  导入你的项目仓库。Vercel 会自动检测这是一个 Vite/React 项目并配置好构建命令。
-4.  部署后，Vercel 会自动将 `api/*.js` 文件作为 Serverless Functions 部署。
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/Airlur/boxy)
+
+或者按照以下步骤手动部署：
+1.  Fork 项目，使用 GitHub 账户登录 [Vercel](https://vercel.com/) 。
+2.  点击右上角的 `Add New` 按钮，下拉框选择第一个 `Project` 。
+3.  选择Boxy，点击 `Import`。`Framework Preset` 选择 `Vite`，点击`Deploy`。
+
 
 ### Cloudflare Pages
-1.  确保你的项目已推送到 GitHub 仓库。
-2.  访问 [Cloudflare Dashboard](https://dash.cloudflare.com/)，选择 Pages。
-3.  连接你的 Git 仓库，并选择 Boxy 项目。
-4.  配置构建设置：
-    *   **构建命令**: `npm run build` 或 `yarn build`
-    *   **构建输出目录**: `dist`
-5.  部署后，Cloudflare Pages 会自动将 `functions/api/*.js` 文件作为 Edge Functions 部署。
-[了解如何在 Cloudflare Pages 部署新站点](https://developers.cloudflare.com/pages/get-started/guide/)
+你可以在Cloudflare Pages上一键部署自己的 Boxy 实例：
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/?to=/:account/pages/new/provider/github)
+
+或者按照以下步骤手动部署：
+1.  Fork 项目，然后登录打开 [Cloudflare Dashbord](https://dash.cloudflare.com/)。
+2.  找到左侧菜单中的 `计算和 AI` ，选择 `Workers 和 Pages`，点击右上角的 `创建应用程序` 。
+3.  点击卡片下方 `Looking to deploy Pages?` 右边的 `Get started` 按钮。
+4.  连接 GitHub账号，选择 Boxy 仓库，点击下方 `开始设置`。
+5.  配置项目设置：
+      - **项目名称**： `boxy`
+      - **生产分支**： `main`
+      - **框架预设**： `React(Vite)`
+      - **构建命令**： `npm run build`
+      - **构建输出目录**： `dist`
+6.  点击 `保存并部署`，等待部署完成。
 
 ## 📦 项目结构概览
 
 *   `public/`: 静态资源文件。
 *   `src/`: 前端 React 应用程序源代码。
     *   `src/App.jsx`: 主要的应用组件，包含大部分业务逻辑和 UI。
-    *   `src/data/initialData.js`: 初始数据定义。
+    *   `src/data/initialData.js`: 提供一些软件的JSON数据。
     *   `src/index.css`: TailwindCSS 样式入口。
 *   `api/`: (Vercel) Serverless Functions 的存放目录，例如 `api/webdav.js`, `api/favicon.js`。
 *   `functions/api/`: (Cloudflare Pages) Edge Functions 的存放目录，例如 `functions/api/webdav.js`, `functions/api/favicon.js`。
