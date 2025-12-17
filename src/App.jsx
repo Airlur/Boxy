@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Box, Layers, Folder, Plus, Search, X, Edit3, Trash2, 
   PlusSquare, Upload, Download, Cloud, ExternalLink, Ghost, 
-  AlertCircle, CheckCircle, RotateCw
+  AlertCircle, CheckCircle, RotateCw, Menu, Globe, BookOpen 
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
@@ -325,7 +325,9 @@ export default function App() {
     
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      sortedCats.forEach(cat => {
+      const targetCats = currentCategory === 'all' ? sortedCats : sortedCats.filter(c => c.id === currentCategory);
+      
+      targetCats.forEach(cat => {
         cat.software.forEach(soft => {
           if (soft.name.toLowerCase().includes(q) || soft.description.toLowerCase().includes(q) || (soft.website||'').includes(q)) {
             items.push({ ...soft, _catName: cat.name, _catId: cat.id });
@@ -352,7 +354,7 @@ export default function App() {
     <div className="flex h-screen overflow-hidden text-sm bg-[#f5f5f5] text-[#171717] font-sans">
       
       {/* Sidebar */}
-      <aside className={`w-64 bg-white border-r border-gray-200 flex flex-col z-20 transition-transform duration-300 fixed md:relative h-full ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 fixed md:relative h-full ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="h-14 flex items-center px-5 border-b border-gray-100 shrink-0 gap-3">
           <div className="w-6 h-6 bg-black rounded flex items-center justify-center text-white shadow-md"><Box size={14} /></div>
           <h1 className="font-bold text-lg tracking-tight">Boxy</h1>
@@ -361,7 +363,7 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-3 space-y-0.5">
           <div className="mb-1">
             <div 
-              onClick={() => { setCurrentCategory('all'); setSearchQuery(''); setIsSidebarOpen(false); }}
+              onClick={() => { setCurrentCategory('all'); setIsSidebarOpen(false); }}
               className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors ${currentCategory === 'all' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
               <div className="flex items-center"><Layers size={16} className="mr-3"/><span>全部软件</span></div>
@@ -374,7 +376,7 @@ export default function App() {
               {[...data.categories].sort((a,b)=>a.sort-b.sort).map(cat => (
                 <SortableItem key={cat.id} id={cat.id} className="group mb-1">
                   <div 
-                    onClick={() => { setCurrentCategory(cat.id); setSearchQuery(''); setIsSidebarOpen(false); }}
+                    onClick={() => { setCurrentCategory(cat.id); setIsSidebarOpen(false); }}
                     className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors ${currentCategory === cat.id ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-black'}`}
                   >
                     <div className="flex items-center truncate">
@@ -402,7 +404,7 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-14 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-10 gap-4">
-          <button className="md:hidden p-1.5 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}><Search size={20} className="text-gray-600" /></button>
+          <button className="md:hidden p-1.5 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}><Menu size={20} className="text-gray-600" /></button>
           
           <div className="flex-1 max-w-lg relative group">
             <Search size={16} className="text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -448,12 +450,14 @@ export default function App() {
                 <button onClick={() => document.getElementById('json-import').click()} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导入数据"><Upload size={18} /></button>
                 <button onClick={() => { 
                     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`; a.click();
                 }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
                 <button onClick={() => setModals({...modals, webdav: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="WebDAV 同步"><Cloud size={18} /></button>
                 <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
+                    if(!e.target.files[0]) return;
+                    if(!confirm('导入数据将覆盖当前所有数据，建议先导出备份！\n是否继续？')) { e.target.value = ''; return; }
                     const reader = new FileReader(); reader.onload = (ev) => { try { saveData(JSON.parse(ev.target.result)); showToast('导入成功'); } catch(err) { showToast('格式错误', 'error'); } };
-                    if(e.target.files[0]) reader.readAsText(e.target.files[0]); e.target.value = '';
+                    reader.readAsText(e.target.files[0]); e.target.value = '';
                 }}/>
             </div>
           </div>
@@ -498,11 +502,14 @@ export default function App() {
                                     <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{soft.description}</p>
                                 </div>
                                 <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50 group-hover:border-gray-100 transition-colors">
-                                    <button disabled={!soft.downloadUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.downloadUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.downloadUrls?.[0] ? '快速下载' : '无链接'}>
+                                    <button disabled={!soft.website} onClick={(e) => { e.stopPropagation(); window.open(soft.website, '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-black px-2 py-1 rounded hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.website ? '访问官网' : '无官网链接'}>
+                                        <Globe size={14} />
+                                    </button>
+                                    <button disabled={!soft.downloadUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.downloadUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.downloadUrls?.[0] ? '快速下载' : '无下载链接'}>
                                         <Download size={14} /> <span className="font-medium">{soft.downloadUrls?.length || 0}</span>
                                     </button>
-                                    <button disabled={!soft.blogUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.blogUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 px-2 py-1 rounded hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.blogUrls?.[0] ? '查看教程' : '无链接'}>
-                                        <ExternalLink size={14} /> <span className="font-medium">{soft.blogUrls?.length || 0}</span>
+                                    <button disabled={!soft.blogUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.blogUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 px-2 py-1 rounded hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.blogUrls?.[0] ? '查看教程' : '无教程链接'}>
+                                        <BookOpen  size={14} /> <span className="font-medium">{soft.blogUrls?.length || 0}</span>
                                     </button>
                                 </div>
                             </div>

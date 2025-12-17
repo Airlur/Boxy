@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ExternalLink } from 'lucide-react';
 
 export function LinksInput({ id, label, initialValues = [] }) {
     const [links, setLinks] = useState(initialValues.length ? initialValues : ['']);
@@ -14,11 +14,12 @@ export function LinksInput({ id, label, initialValues = [] }) {
                 {links.map((link, idx) => (
                     <div key={idx} className="flex gap-2">
                         <input name={`${id}[]`} defaultValue={link} placeholder="https://" className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-black outline-none" />
+                        <button type="button" onClick={() => link && window.open(link, '_blank')} className="text-gray-400 hover:text-black" title="访问"><ExternalLink size={16}/></button>
                         <button type="button" onClick={(e) => {
                              const newLinks = [...links];
                              newLinks.splice(idx, 1);
                              setLinks(newLinks);
-                        }} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
+                        }} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button>
                     </div>
                 ))}
             </div>

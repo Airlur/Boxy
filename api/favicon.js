@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
     // 透传 Content-Type，设置缓存
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400'); 
+    res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=604800, immutable'); 
     
     return res.send(buffer);
 

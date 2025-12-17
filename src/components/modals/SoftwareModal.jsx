@@ -42,7 +42,7 @@ export function SoftwareModal({ editingSoft, categories, currentCategory, onSave
                 </form>
                 <div className="p-5 border-t border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-b-xl">
                     {editingSoft ? 
-                        <button type="button" onClick={onDelete} className="text-red-500 hover:text-red-700 text-xs font-medium flex items-center gap-1"><Trash size={14} /> 删除</button> 
+                        <button type="button" onClick={onDelete} className="text-red-500 hover:text-red-700 text-sm font-medium px-4 py-2 hover:bg-red-50 rounded-md transition-colors">删除</button> 
                         : <div></div>
                     }
                     <div className="flex gap-3">

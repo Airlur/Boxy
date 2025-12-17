@@ -27,7 +27,7 @@ export async function onRequest(context) {
     return new Response(response.body, {
       headers: {
         'Content-Type': response.headers.get('content-type') || 'image/png',
-        'Cache-Control': 'public, max-age=86400'
+        'Cache-Control': 'public, max-age=604800, immutable'
       }
     });
 
