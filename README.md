@@ -1,16 +1,86 @@
-# React + Vite
+# Boxy - 你的专属应用收藏与管理工具
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Boxy 是一款轻量级的个人应用管理工具，旨在帮助你高效地收藏、整理和查找各类软件及应用程序。通过直观的界面和便捷的拖拽操作，你可以轻松管理你的数字资产，并支持 WebDAV 同步，确保数据安全与便捷。
 
-Currently, two official plugins are available:
+## ✨ 主要特性
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+*   **应用与分类管理**: 创建、编辑、删除应用和分类，构建清晰的管理结构。
+*   **拖拽排序**: 通过拖拽即可调整分类和应用的位置，实现个性化布局。
+*   **快速搜索**: 实时搜索功能，帮助你迅速找到目标应用。
+*   **数据导入/导出**: 支持 JSON 格式的数据备份与恢复。
+*   **WebDAV 同步**: 无缝对接 WebDAV 服务，将你的应用数据同步到云端，多设备访问无忧，确保数据永不丢失。
+*   **智能图标获取**: 优化应用图标的加载逻辑，提供多级降级策略（代理 API -> Google 直连 -> 文字首字母），确保在不同网络环境下（尤其是在网络受限区域）也能稳定显示图标。
 
-## React Compiler
+## 🛠️ 技术栈
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*   **前端**: React, Vite, TailwindCSS
+*   **UI 组件**: Lucide Icons
+*   **拖拽库**: Dnd-kit
+*   **后端 (Serverless Functions)**: Vercel Serverless Functions (Node.js) / Cloudflare Pages Functions (Edge Runtime)
 
-## Expanding the ESLint configuration
+## 🚀 快速开始 (本地开发)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+请确保你的本地环境已安装 Node.js (v18+) 和 npm 或 yarn。
+
+1.  **克隆仓库**:
+    ```bash
+    git clone https://github.com/your-username/boxy.git
+    cd boxy
+    ```
+2.  **安装依赖**:
+    ```bash
+    npm install
+    # 或者
+    yarn install
+    ```
+3.  **启动开发服务器**:
+    ```bash
+    npm run dev
+    # 或者
+    yarn dev
+    ```
+    应用将在 `http://localhost:5173` (或命令行提示的其他端口) 启动。
+
+    **注意**: 在本地 `npm run dev` 环境下，Favicon 的代理 API (`/api/favicon`) 不会被自动模拟。前端会尝试请求该代理 API，失败后会自动降级为直接请求 Google Favicon API。如果你本地开启了代理，则会正常显示图标；如果未开启代理且无法访问 Google，则会显示应用名称的首字母。
+
+## 部署
+
+Boxy 支持部署到 Vercel 或 Cloudflare Pages 等平台。
+
+### Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/your-username/boxy)
+
+1.  确保你的项目已推送到 GitHub/GitLab/Bitbucket 仓库。
+2.  访问 [Vercel](https://vercel.com/) 并使用你的 Git 账户登录。
+3.  导入你的项目仓库。Vercel 会自动检测这是一个 Vite/React 项目并配置好构建命令。
+4.  部署后，Vercel 会自动将 `api/*.js` 文件作为 Serverless Functions 部署。
+
+### Cloudflare Pages
+1.  确保你的项目已推送到 GitHub 仓库。
+2.  访问 [Cloudflare Dashboard](https://dash.cloudflare.com/)，选择 Pages。
+3.  连接你的 Git 仓库，并选择 Boxy 项目。
+4.  配置构建设置：
+    *   **构建命令**: `npm run build` 或 `yarn build`
+    *   **构建输出目录**: `dist`
+5.  部署后，Cloudflare Pages 会自动将 `functions/api/*.js` 文件作为 Edge Functions 部署。
+[了解如何在 Cloudflare Pages 部署新站点](https://developers.cloudflare.com/pages/get-started/guide/)
+
+## 📦 项目结构概览
+
+*   `public/`: 静态资源文件。
+*   `src/`: 前端 React 应用程序源代码。
+    *   `src/App.jsx`: 主要的应用组件，包含大部分业务逻辑和 UI。
+    *   `src/data/initialData.js`: 初始数据定义。
+    *   `src/index.css`: TailwindCSS 样式入口。
+*   `api/`: (Vercel) Serverless Functions 的存放目录，例如 `api/webdav.js`, `api/favicon.js`。
+*   `functions/api/`: (Cloudflare Pages) Edge Functions 的存放目录，例如 `functions/api/webdav.js`, `functions/api/favicon.js`。
+*   `vite.config.js`: Vite 配置。
+*   `tailwind.config.js`: TailwindCSS 配置。
+
+## 🤝 贡献
+
+欢迎提出任何改进建议或提交 Pull Request。
+
+## 📄 许可证
+
+本项目采用 MIT 许可证。
