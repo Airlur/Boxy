@@ -1,88 +1,100 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Box, Layers, Folder, Plus, Search, X, Edit3, Trash2, 
-  PlusSquare, Upload, Download, Cloud, ExternalLink, Trash,
-  Ghost, AlertCircle, CheckCircle, CloudDownload, CloudUpload, Eye, EyeOff
+  PlusSquare, Upload, Download, Cloud, ExternalLink, Ghost, 
+  AlertCircle, CheckCircle, RotateCw
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+
 import { initialData } from './data/initialData';
-
-// --- 组件：SortableItem ---
-function SortableItem({ id, children, className, disabled }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
-    id,
-    disabled // 禁用选中 全部软件 时的拖拽功能
-  });
-  
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 50 : 'auto',
-    position: 'relative',
-    touchAction: 'none'
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
-      {children}
-    </div>
-  );
-}
-
-// --- 辅助组件：动态链接输入 ---
-function LinksInput({ id, label, initialValues = [] }) {
-    const [links, setLinks] = useState(initialValues.length ? initialValues : ['']);
-    
-    return (
-        <div>
-            <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-medium text-gray-500">{label}</label>
-                <button type="button" onClick={() => setLinks([...links, ''])} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><Plus size={12} /> 添加</button>
-            </div>
-            <div id={id} className="space-y-2">
-                {links.map((link, idx) => (
-                    <div key={idx} className="flex gap-2">
-                        <input name={`${id}[]`} defaultValue={link} placeholder="https://" className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-black outline-none" />
-                        <button type="button" onClick={(e) => e.target.closest('div').remove()} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+import { SortableItem } from './components/SortableItem';
+import { WebDavModal } from './components/modals/WebDavModal';
+import { CategoryModal } from './components/modals/CategoryModal';
+import { SoftwareModal } from './components/modals/SoftwareModal';
 
 export default function App() {
+  // --- State ---
   const [data, setData] = useState(initialData);
   const [currentCategory, setCurrentCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // 模态框
+  // Modals
   const [modals, setModals] = useState({ software: false, category: false, webdav: false });
   const [editingSoft, setEditingSoft] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
   
-  // WebDAV
-  const [wdConfig, setWdConfig] = useState({ url: '', user: '', pass: '', remember: false });
-  const [showPass, setShowPass] = useState(false);
+  // WebDAV Config
+  const [wdConfig, setWdConfig] = useState({ url: '', user: '', pass: '', remember: false, autoSync: false });
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Toast
   const [toast, setToast] = useState(null);
 
-  // 初始化
-  useEffect(() => {
-    const local = localStorage.getItem('boxy_data');
-    if (local) {
-      try { setData(JSON.parse(local)); } catch (e) { showToast('本地数据损坏', 'error'); }
-    }
-    const savedWd = localStorage.getItem('boxy_webdav_config');
-    if (savedWd) setWdConfig(JSON.parse(savedWd));
+  // Debounce Timer Ref for Auto-Sync
+  const autoSyncTimer = useRef(null);
 
-    // 快捷键 Ctrl + E
+  // --- Helpers ---
+  const showToast = (msg, type = 'success', duration = 3000) => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), duration);
+  };
+
+  const getDomain = (soft) => {
+    let domain = '';
+    try { if (soft.website) domain = new URL(soft.website).hostname; } catch(e){}
+    if (!domain && soft.downloadUrls?.[0]) try { domain = new URL(soft.downloadUrls[0]).hostname; } catch(e){}
+    return domain;
+  };
+
+  // --- Core Data Logic ---
+  
+  // 统一保存入口：更新 State -> 更新 LocalStorage -> (可选) 触发自动同步
+  const saveData = (newData, skipAutoSync = false) => {
+    // 更新时间戳
+    const dataWithTs = { ...newData, updatedAt: Date.now() };
+    
+    setData(dataWithTs);
+    localStorage.setItem('boxy_data', JSON.stringify(dataWithTs));
+
+    // Auto-Sync Logic
+    if (!skipAutoSync && wdConfig.autoSync && wdConfig.url) {
+        if (autoSyncTimer.current) clearTimeout(autoSyncTimer.current);
+        
+        // 防抖 2秒：用户停止操作2秒后，自动推送
+        autoSyncTimer.current = setTimeout(() => {
+            console.log('Triggering Auto-Sync Push...');
+            handleWebDav('push', dataWithTs, true); 
+        }, 2000);
+    }
+  };
+
+  // --- Initialization ---
+  useEffect(() => {
+    // 1. Load Local Data
+    const local = localStorage.getItem('boxy_data');
+    let currentLocalData = initialData;
+    if (local) {
+      try { 
+          currentLocalData = JSON.parse(local);
+          setData(currentLocalData); 
+      } catch (e) { showToast('本地数据损坏', 'error'); }
+    }
+
+    // 2. Load WebDAV Config & Auto Pull
+    const savedWd = localStorage.getItem('boxy_webdav_config');
+    if (savedWd) {
+        const config = JSON.parse(savedWd);
+        setWdConfig(config);
+
+        // 如果开启了自动同步，启动时尝试拉取
+        if (config.autoSync && config.url && config.user && config.pass) {
+            handleWebDav('pull', currentLocalData, true, config);
+        }
+    }
+
+    // Keyboard Shortcuts
     const handleKeyDown = (e) => {
         if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyE')) {
             e.preventDefault();
@@ -93,14 +105,95 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const saveData = (newData) => {
-    setData(newData);
-    localStorage.setItem('boxy_data', JSON.stringify(newData));
+  // Save WebDAV Config when changed
+  useEffect(() => {
+    if (wdConfig.remember) {
+        localStorage.setItem('boxy_webdav_config', JSON.stringify(wdConfig));
+    } else {
+        localStorage.removeItem('boxy_webdav_config');
+    }
+  }, [wdConfig]);
+
+
+  // --- WebDAV Operations ---
+  
+  /**
+   * @param {'push'|'pull'} type 
+   * @param {Object} currentData - 当前数据，用于对比
+   * @param {boolean} silent - 是否静默模式（不弹 Toast，除非出错）
+   * @param {Object} overrideConfig - 可选，用于在 State 更新前使用的配置
+   */
+  const handleWebDav = async (type, currentData = data, silent = false, overrideConfig = wdConfig) => {
+    const config = overrideConfig;
+
+    if (!config.url) {
+        if(!silent) showToast('请输入服务器地址', 'error');
+        return;
+    }
+
+    let url = config.url.replace(/\/+$/, '');
+    if (!url.endsWith('/Boxy')) url += '/Boxy';
+    const targetEndpoint = url + '/boxy_data.json';
+
+    if (!silent) showToast(type === 'push' ? '正在上传...' : '正在下载...', 'info');
+    setIsSyncing(true);
+
+    try {
+      const res = await fetch('/api/webdav', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: targetEndpoint,
+          username: config.user,
+          password: config.pass,
+          method: type === 'push' ? 'PUT' : 'GET',
+          data: type === 'push' ? currentData : undefined
+        })
+      });
+
+      const result = await res.json();
+      
+      // Handle 404 on Pull (First time user)
+      if (type === 'pull' && res.status === 404) {
+         if(!silent) showToast('云端暂无数据，请先推送', 'info');
+         setIsSyncing(false);
+         return;
+      }
+
+      if (!res.ok) throw new Error(result.error || res.statusText);
+
+      if (type === 'pull') {
+        const cloudData = result;
+        const localTs = currentData.updatedAt || 0;
+        const cloudTs = cloudData.updatedAt || 0;
+
+        // 智能合并策略：如果云端数据更新，才覆盖
+        if (cloudTs > localTs) {
+            saveData(cloudData, true); // skip auto-sync to avoid loop
+            if (!silent) showToast('已同步云端最新数据');
+            else console.log('Auto-Pull: Local data updated from cloud.');
+        } else {
+            if (!silent) showToast('本地数据已是最新');
+            else console.log('Auto-Pull: Local data is up to date.');
+        }
+      } else {
+        // Push Success
+        if (!silent) showToast('✅ 推送成功');
+        else console.log('Auto-Push: Success.');
+      }
+      
+      if (!silent) setModals(prev => ({ ...prev, webdav: false }));
+
+    } catch (e) {
+      console.error(e);
+      if (!silent || e.message !== 'Failed to fetch') showToast(`同步失败: ${e.message}`, 'error');
+    } finally {
+        setIsSyncing(false);
+    }
   };
 
-  const countTotal = () => data.categories.reduce((acc, c) => acc + c.software.length, 0);
 
-  // --- 拖拽逻辑 ---
+  // --- Drag & Drop ---
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -110,7 +203,7 @@ export default function App() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    // 1. 侧边栏拖拽
+    // 1. Categories
     const isCategoryDrag = data.categories.some(c => c.id === active.id);
     if (isCategoryDrag) {
         const oldIndex = data.categories.findIndex(c => c.id === active.id);
@@ -120,7 +213,7 @@ export default function App() {
         return;
     } 
     
-    // 2. 软件拖拽 (如果在"全部"或"搜索"模式下，SortableItem 已禁用，理论上不会触发这里，但做个双重保险)
+    // 2. Software
     if (currentCategory === 'all' || searchQuery) return;
     
     const catIndex = data.categories.findIndex(c => c.id === currentCategory);
@@ -138,50 +231,9 @@ export default function App() {
     }
   };
 
-  // --- WebDAV 逻辑 ---
-  const handleWebDav = async (type) => {
-    if (!wdConfig.url) return showToast('请输入服务器地址', 'error');
-    if (!wdConfig.url.startsWith('http')) return showToast('地址需以 http 开头', 'error');
-
-    if (wdConfig.remember) localStorage.setItem('boxy_webdav_config', JSON.stringify(wdConfig));
-    else localStorage.removeItem('boxy_webdav_config');
-
-    let url = wdConfig.url.replace(/\/+$/, '');
-    if (!url.endsWith('/Boxy')) url += '/Boxy';
-    const targetEndpoint = url + '/boxy_data.json';
-
-    showToast(type === 'push' ? '正在上传...' : '正在下载...', 'info');
-
-    try {
-      const res = await fetch('/api/webdav', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: targetEndpoint,
-          username: wdConfig.user,
-          password: wdConfig.pass,
-          method: type === 'push' ? 'PUT' : 'GET',
-          data: type === 'push' ? data : undefined
-        })
-      });
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || res.statusText);
-
-      if (type === 'pull') {
-        saveData(result);
-        showToast('✅ 同步成功：数据已更新');
-      } else {
-        showToast('✅ 推送成功：云端已更新');
-      }
-      setModals({ ...modals, webdav: false });
-    } catch (e) {
-      console.error(e);
-      showToast(`❌ 失败: ${e.message}`, 'error');
-    }
-  };
-
-  // --- CRUD 操作 (补全遗漏的逻辑) ---
+  // --- Event Handlers ---
+  
+  // Save Software (Add/Edit)
   const handleSaveSoftware = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -191,7 +243,6 @@ export default function App() {
       name: fd.get('name'),
       website: fd.get('website'),
       description: fd.get('description'),
-      // 使用 FormData.getAll 获取数组数据，移除 DOM 操作
       downloadUrls: fd.getAll('dl-inputs[]').map(v => v.trim()).filter(Boolean),
       blogUrls: fd.getAll('blog-inputs[]').map(v => v.trim()).filter(Boolean),
       sort: 999
@@ -200,18 +251,18 @@ export default function App() {
     if(!newSoft.name) return showToast('请输入名称', 'error');
 
     let newCats = [...data.categories];
-    // 移除旧数据 (如果是编辑)
+    // Remove old if editing
     if (fd.get('id')) {
         newCats.forEach(c => {
             const idx = c.software.findIndex(s => s.id === newSoft.id);
             if(idx > -1) { 
-                newSoft.sort = c.software[idx].sort; // 保持原排序
+                newSoft.sort = c.software[idx].sort;
                 c.software.splice(idx, 1); 
             }
         });
     }
     
-    // 添加到新分类
+    // Add to new category
     const targetCat = newCats.find(c => c.id === fd.get('categoryId'));
     if(targetCat) {
         targetCat.software.push(newSoft);
@@ -224,7 +275,8 @@ export default function App() {
     showToast('保存成功');
   };
 
-  const deleteSoftware = () => {
+  // Delete Software
+  const handleDeleteSoftware = () => {
     if(!confirm('确认删除？') || !editingSoft) return;
     let newCats = [...data.categories];
     newCats.forEach(c => {
@@ -235,12 +287,20 @@ export default function App() {
     showToast('已删除');
   };
 
-  const showToast = (msg, type = 'success', duration = 3000) => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), duration);
+  // Save Category
+  const handleSaveCategory = (name) => {
+      if(editingCat) { 
+          saveData({...data, categories: data.categories.map(c => c.id === editingCat.id ? {...c, name} : c)}); 
+      } else { 
+          saveData({...data, categories: [...data.categories, {id: 'c_'+Date.now(), name, sort: 99, software: []}]}); 
+      }
+      setModals({...modals, category: false});
   };
 
-  // --- 数据展示计算 ---
+
+  // --- Data Calculations ---
+  const countTotal = () => data.categories.reduce((acc, c) => acc + c.software.length, 0);
+
   const displayedItems = useMemo(() => {
     let items = [];
     const sortedCats = [...data.categories].sort((a, b) => a.sort - b.sort);
@@ -268,17 +328,12 @@ export default function App() {
     return items;
   }, [data, currentCategory, searchQuery]);
 
-  const getDomain = (soft) => {
-    let domain = '';
-    try { if (soft.website) domain = new URL(soft.website).hostname; } catch(e){}
-    if (!domain && soft.downloadUrls?.[0]) try { domain = new URL(soft.downloadUrls[0]).hostname; } catch(e){}
-    return domain;
-  };
 
+  // --- Render ---
   return (
     <div className="flex h-screen overflow-hidden text-sm bg-[#f5f5f5] text-[#171717] font-sans">
       
-      {/* 侧边栏 */}
+      {/* Sidebar */}
       <aside className={`w-64 bg-white border-r border-gray-200 flex flex-col z-20 transition-transform duration-300 fixed md:relative h-full ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="h-14 flex items-center px-5 border-b border-gray-100 shrink-0 gap-3">
           <div className="w-6 h-6 bg-black rounded flex items-center justify-center text-white shadow-md"><Box size={14} /></div>
@@ -296,7 +351,7 @@ export default function App() {
             </div>
           </div>
           
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e)}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={data.categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
               {[...data.categories].sort((a,b)=>a.sort-b.sort).map(cat => (
                 <SortableItem key={cat.id} id={cat.id} className="group mb-1">
@@ -323,10 +378,10 @@ export default function App() {
         </div>
       </aside>
 
-      {/* 遮罩 */}
+      {/* Overlay */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-10 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
 
-      {/* 主内容 */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-14 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-10 gap-4">
           <button className="md:hidden p-1.5 hover:bg-gray-100 rounded-md" onClick={() => setIsSidebarOpen(true)}><Search size={20} className="text-gray-600" /></button>
@@ -343,6 +398,14 @@ export default function App() {
             />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"><X size={14} /></button>}
           </div>
+
+          {/* Sync Status Indicator */}
+          {wdConfig.autoSync && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-500">
+                  {isSyncing ? <RotateCw size={12} className="animate-spin text-blue-500"/> : <Cloud size={12} />}
+                  <span>{isSyncing ? '同步中...' : '已开启同步'}</span>
+              </div>
+          )}
         </header>
 
         <main className="flex-1 overflow-y-auto bg-[#fafafa] p-6 relative">
@@ -369,7 +432,7 @@ export default function App() {
                     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
                     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
                 }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
-                <button onClick={() => setModals({...modals, webdav: true})} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-blue-600 hover:text-blue-700 transition-colors" data-tip="WebDAV 同步"><Cloud size={18} /></button>
+                <button onClick={() => setModals({...modals, webdav: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="WebDAV 同步"><Cloud size={18} /></button>
                 <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
                     const reader = new FileReader(); reader.onload = (ev) => { try { saveData(JSON.parse(ev.target.result)); showToast('导入成功'); } catch(err) { showToast('格式错误', 'error'); } };
                     if(e.target.files[0]) reader.readAsText(e.target.files[0]); e.target.value = '';
@@ -384,9 +447,7 @@ export default function App() {
                     const domain = getDomain(soft);
                     const proxyUrl = domain ? `/api/favicon?domain=${domain}` : null;
                     const googleUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
-                    
                     const firstChar = soft.name.charAt(0).toUpperCase();
-                    // 修复：如果当前是"全部软件"或"搜索结果"，禁用拖拽属性 (disabled={true})
                     const isDragDisabled = currentCategory === 'all' || !!searchQuery;
                     
                     return (
@@ -401,11 +462,9 @@ export default function App() {
                                                 alt={soft.name} 
                                                 className="w-full h-full object-contain p-1" 
                                                 onError={(e) => {
-                                                    // 第一次失败：如果当前是代理地址，降级到 Google 直连
                                                     if (e.target.src.includes('/api/favicon')) {
                                                         e.target.src = googleUrl;
                                                     } else {
-                                                        // 第二次失败（Google 也挂了）：降级到文字
                                                         e.target.onerror = null; 
                                                         e.target.style.display = 'none'; 
                                                         e.target.parentElement.innerText = firstChar;
@@ -442,82 +501,33 @@ export default function App() {
       {/* Toast */}
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none animate-modal-in"><div className={`px-4 py-2 rounded-full shadow-lg text-sm font-medium text-white flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-black'}`}>{toast.type==='error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />} {toast.msg}</div></div>}
 
-      {/* WebDAV Modal */}
+      {/* Modals */}
       {modals.webdav && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm dialog-backdrop" onClick={() => setModals({...modals, webdav: false})}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-gray-100 relative z-10 animate-modal-in">
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center"><h3 className="font-bold text-lg">WebDAV 同步</h3><button onClick={() => setModals({...modals, webdav: false})}><X size={16} className="text-gray-400 hover:text-black"/></button></div>
-                <div className="p-6 space-y-4">
-                    <div><label className="block text-xs font-medium text-gray-500 mb-1">服务器地址</label><input type="text" value={wdConfig.url} onChange={e=>setWdConfig({...wdConfig, url: e.target.value})} placeholder="https://dav.example.com/" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:border-black"/></div>
-                    <div><label className="block text-xs font-medium text-gray-500 mb-1">用户名</label><input type="text" value={wdConfig.user} onChange={e=>setWdConfig({...wdConfig, user: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:border-black"/></div>
-                    {/* 修复：使用 relative 容器包裹 input 和 eye button */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">密码 (应用密码)</label>
-                        <div className="relative">
-                            <input type={showPass ? "text" : "password"} value={wdConfig.pass} onChange={e=>setWdConfig({...wdConfig, pass: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:border-black pr-8"/>
-                            <button type="button" onClick={()=>setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                {showPass ? <EyeOff size={14}/> : <Eye size={14}/>}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2"><input type="checkbox" id="wd-remember" checked={wdConfig.remember} onChange={e=>setWdConfig({...wdConfig, remember: e.target.checked})} /><label htmlFor="wd-remember" className="text-xs text-gray-500 select-none cursor-pointer">记住密码 (保存在本地)</label></div>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                        <button onClick={() => handleWebDav('pull')} className="flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors"><CloudDownload size={16} className="text-blue-600"/> 拉取</button>
-                        <button onClick={() => handleWebDav('push')} className="flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors"><CloudUpload size={16}/> 推送</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <WebDavModal 
+            config={wdConfig} 
+            setConfig={setWdConfig} 
+            onSync={(type) => handleWebDav(type)} 
+            onClose={() => setModals({...modals, webdav: false})} 
+        />
       )}
-
-      {/* Category Modal */}
+      
       {modals.category && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm dialog-backdrop" onClick={() => setModals({...modals, category: false})}></div>
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 relative z-10 animate-modal-in">
-                <h3 className="font-bold text-lg mb-4">{editingCat ? '编辑分类' : '新增分类'}</h3>
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    const name = e.target.catName.value; if(!name) return;
-                    if(editingCat) { saveData({...data, categories: data.categories.map(c => c.id === editingCat.id ? {...c, name} : c)}); } 
-                    else { saveData({...data, categories: [...data.categories, {id: 'c_'+Date.now(), name, sort: 99, software: []}]}); }
-                    setModals({...modals, category: false});
-                }}>
-                    <div className="mb-5"><label className="block text-xs font-medium text-gray-500 mb-1.5">分类名称</label><input name="catName" defaultValue={editingCat?.name} autoFocus className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:border-black outline-none" /></div>
-                    <div className="flex justify-end gap-3"><button type="button" onClick={() => setModals({...modals, category: false})} className="px-4 py-2 text-sm font-medium text-gray-600">取消</button><button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-black rounded-md hover:bg-gray-800">保存</button></div>
-                </form>
-            </div>
-        </div>
+        <CategoryModal 
+            editingCat={editingCat} 
+            onSave={handleSaveCategory} 
+            onClose={() => setModals({...modals, category: false})} 
+        />
       )}
-
-      {/* Software Modal */}
+      
       {modals.software && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm dialog-backdrop" onClick={() => setModals({...modals, software: false})}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-gray-100 relative z-10 animate-modal-in max-h-[90vh] flex flex-col">
-                <div className="flex items-center justify-between p-5 border-b border-gray-100"><h3 className="font-bold text-lg">{editingSoft ? '编辑软件' : '添加软件'}</h3><button onClick={() => setModals({...modals, software: false})}><X size={20} className="text-gray-400 hover:text-black"/></button></div>
-                <form id="softForm" onSubmit={handleSaveSoftware} className="p-6 overflow-y-auto">
-                    <input type="hidden" name="id" defaultValue={editingSoft?.id} />
-                    <div className="grid gap-5">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-medium text-gray-500 mb-1.5">名称</label><input name="name" required defaultValue={editingSoft?.name} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" /></div>
-                            <div><label className="block text-xs font-medium text-gray-500 mb-1.5">官网</label><input name="website" defaultValue={editingSoft?.website} placeholder="https://" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" /></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-medium text-gray-500 mb-1.5">分类</label><select name="categoryId" defaultValue={editingSoft ? editingSoft._catId : (currentCategory!=='all'?currentCategory:data.categories[0]?.id)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black">{data.categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                            <div><label className="block text-xs font-medium text-gray-500 mb-1.5">描述</label><input name="description" defaultValue={editingSoft?.description} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black" /></div>
-                        </div>
-                        <LinksInput id="dl-inputs" label="下载链接" initialValues={editingSoft?.downloadUrls} />
-                        <LinksInput id="blog-inputs" label="博客/教程链接" initialValues={editingSoft?.blogUrls} />
-                    </div>
-                </form>
-                <div className="p-5 border-t border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-b-xl">
-                    {editingSoft ? <button type="button" onClick={deleteSoftware} className="text-red-500 hover:text-red-700 text-xs font-medium flex items-center gap-1"><Trash size={14} /> 删除</button> : <div></div>}
-                    <div className="flex gap-3"><button type="button" onClick={() => setModals({...modals, software: false})} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black">取消</button><button type="submit" form="softForm" className="px-4 py-2 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-md shadow-sm">保存</button></div>
-                </div>
-            </div>
-        </div>
+        <SoftwareModal 
+            editingSoft={editingSoft} 
+            categories={data.categories} 
+            currentCategory={currentCategory}
+            onSave={handleSaveSoftware}
+            onDelete={handleDeleteSoftware}
+            onClose={() => setModals({...modals, software: false})} 
+        />
       )}
     </div>
   );
