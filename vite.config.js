@@ -50,4 +50,7 @@ const localWebDavProxy = () => ({
 
 export default defineConfig({
   plugins: [react(), localWebDavProxy()],
+  server: {
+    port: 3137
+  }
 })
