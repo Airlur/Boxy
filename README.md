@@ -40,6 +40,19 @@ Boxy 是一款轻量级的个人应用管理导航工具，旨在帮助你高效
 
 **注意**：在本地 `npm run dev` 环境下，Favicon 的代理 API (`/api/favicon`) 不会被自动模拟。前端会尝试请求该代理 API，失败后会自动降级为直接请求 Google Favicon API。如果你本地开启了代理，则会正常显示图标；如果未开启代理且无法访问 Google，则会显示应用名称的首字母。
 
+## ☁️ WebDAV 同步指南
+
+Boxy 支持通过 WebDAV 协议将你的数据同步到云端，实现多设备间的数据共享与备份。
+
+### 配置说明
+1.  **服务器地址**: 输入完整的 WebDAV 地址，例如 `https://dav.jianguoyun.com/dav/` 或 `https://zeze.teracloud.jp/dav/`。
+2.  **账号密码**: 
+    *   使用 **应用密码 (App Password)** 而非账号登录密码。
+3.  **自动同步**:
+    *   开启后，Boxy 会在启动时尝试拉取云端最新数据。
+    *   当你修改数据（添加、排序、删除）并停止操作 2 秒后，Boxy 会自动将变更推送到云端。
+    *   *注意：开启自动同步必须勾选“记住密码”。*
+
 ## 部署
 
 Boxy 支持部署到 Vercel 或 Cloudflare Pages 等平台。
