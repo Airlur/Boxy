@@ -563,6 +563,7 @@ export default function App() {
             onSave={handleSaveSoftware}
             onDelete={handleDeleteSoftware}
             onClose={() => setModals({...modals, software: false})} 
+            showToast={showToast}
         />
       )}
     </div>
