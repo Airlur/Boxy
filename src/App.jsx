@@ -2,16 +2,17 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Box, Layers, Folder, Plus, Search, X, Edit3, Trash2, 
   PlusSquare, Upload, Download, Cloud, ExternalLink, Ghost, 
-  AlertCircle, CheckCircle, RotateCw, Menu, Globe, BookOpen 
+  AlertCircle, CheckCircle, RotateCw, Menu, Globe, BookOpen, Settings, GitBranch, Share2
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 
-import initialData from './data/initialData.json';
+import { initialData } from './data/initialData';
 import { SortableItem } from './components/SortableItem';
-import { WebDavModal } from './components/modals/WebDavModal';
+import { SettingsModal } from './components/modals/SettingsModal';
 import { CategoryModal } from './components/modals/CategoryModal';
 import { SoftwareModal } from './components/modals/SoftwareModal';
+import { ShareModal } from './components/modals/ShareModal';
 
 export default function App() {
   // --- State ---
@@ -21,9 +22,13 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Modals
-  const [modals, setModals] = useState({ software: false, category: false, webdav: false });
+  const [modals, setModals] = useState({ software: false, category: false, settings: false, share: false });
   const [editingSoft, setEditingSoft] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
+  const [shareSoft, setShareSoft] = useState(null);
+  
+  // Preview Mode
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   
   // WebDAV 配置
   const [wdConfig, setWdConfig] = useState({ url: '', user: '', pass: '', remember: false, autoSync: false });
@@ -52,6 +57,12 @@ export default function App() {
   
   // 统一保存入口：更新 State -> 更新 LocalStorage -> (可选) 触发自动同步
   const saveData = (newData, skipAutoSync = false) => {
+    // 预览模式禁止保存
+    if (isPreviewMode) {
+        showToast('预览模式无法保存修改', 'error');
+        return;
+    }
+
     // 更新时间戳
     const dataWithTs = { ...newData, updatedAt: Date.now() };
     
@@ -72,6 +83,46 @@ export default function App() {
 
   // --- 初始化 ---
   useEffect(() => {
+    // Check for Share ID
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    
+    if (shareId) {
+        setIsPreviewMode(true);
+        
+        // Mock Data for Local Testing
+        if (shareId === 'mock-gist-id-12345') {
+            showToast('加载测试预览数据...');
+            setTimeout(() => {
+                setData({
+                    categories: [{
+                        id: 'mock_cat', name: '测试分类', sort: 1,
+                        software: [{
+                            id: 'mock_soft', name: '测试软件', website: 'https://example.com', 
+                            description: '这是一个测试预览数据', downloadUrls: [], blogUrls: [], sort: 1
+                        }]
+                    }],
+                    updatedAt: Date.now()
+                });
+                showToast('已加载测试数据');
+            }, 500);
+            return;
+        }
+
+        showToast('正在加载分享内容...', 'info');
+        fetch(`https://api.github.com/gists/${shareId}`)
+            .then(r => { if(!r.ok) throw new Error('Gist not found'); return r.json(); })
+            .then(d => {
+                try {
+                    const content = JSON.parse(d.files['boxy_data.json'].content);
+                    setData(content);
+                    showToast('已加载分享预览');
+                } catch(e) { throw new Error('Invalid data format'); }
+            })
+            .catch(e => showToast(`加载失败: ${e.message}`, 'error'));
+        return; // Skip local load
+    }
+
     // 1. 加载本地数据
     const local = localStorage.getItem('boxy_data');
     let currentLocalData = initialData;
@@ -197,10 +248,10 @@ export default function App() {
       } else {
         // Push Success
         if (!silent) showToast('推送成功');
-        else console.log(`[${new Date().toLocaleString()}] 自动推送: 成功。`);
+        else console.log('Auto-Push: Success.');
       }
       
-      if (!silent) setModals(prev => ({ ...prev, webdav: false }));
+      if (!silent) setModals(prev => ({ ...prev, settings: false }));
 
     } catch (e) {
       console.error(e);
@@ -208,6 +259,62 @@ export default function App() {
     } finally {
         setIsSyncing(false);
     }
+  };
+
+  // --- Share All ---
+  const handleShareAll = async () => {
+      if (!confirm('确定要生成当前所有数据的分享链接吗？\n(将创建匿名 Gist)')) return;
+      
+      showToast('正在生成链接...', 'info');
+      try {
+          const res = await fetch('/api/gist', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  content: JSON.stringify(data, null, 2),
+                  description: 'Boxy Library Share'
+              })
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error);
+          
+          const link = `${window.location.origin}/?share=${result.id}`;
+          navigator.clipboard.writeText(link);
+          showToast('链接已生成并复制！');
+      } catch (e) {
+          console.error(e);
+          showToast(`生成失败: ${e.message}`, 'error');
+      }
+  };
+
+  // --- Admin: Update Repo ---
+  const handleUpdateRepo = async () => {
+      const pwd = prompt('请输入管理员密码 (ADMIN_PASSWORD):');
+      if (pwd === null) return;
+
+      const msg = prompt('请输入 Commit 信息:', 'chore: update initial data via admin panel');
+      if (msg === null) return;
+
+      showToast('正在更新仓库...', 'info');
+      try {
+          const res = await fetch('/api/update-repo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  content: JSON.stringify(data, null, 2),
+                  message: msg,
+                  password: pwd
+              })
+          });
+          
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error);
+          
+          showToast('仓库更新成功！部署即将触发');
+      } catch (e) {
+          console.error(e);
+          showToast(`更新失败: ${e.message}`, 'error');
+      }
   };
 
 
@@ -430,6 +537,44 @@ export default function App() {
           )}
         </header>
 
+        {/* Preview Mode Bar */}
+        {isPreviewMode && (
+            <div className="bg-blue-600 text-white px-6 py-3 flex items-center justify-between shadow-md z-10 animate-fade-in">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <Globe size={16} />
+                    <span>正在预览分享内容 (只读模式)</span>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={() => { window.location.href = window.location.pathname; }} className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs transition-colors">退出预览</button>
+                    <button onClick={() => {
+                        if(confirm('将尝试合并分享内容到你的本地库。\n(相同ID跳过，不同ID追加)\n是否继续？')) {
+                            // Merge Logic
+                            const localData = JSON.parse(localStorage.getItem('boxy_data') || JSON.stringify(initialData));
+                            const merged = { ...localData, updatedAt: Date.now() };
+                            
+                            data.categories.forEach(shareCat => {
+                                const localCat = merged.categories.find(c => c.id === shareCat.id) || merged.categories.find(c => c.name === shareCat.name);
+                                if (localCat) {
+                                    // Merge software
+                                    shareCat.software.forEach(s => {
+                                        if (!localCat.software.some(ls => ls.id === s.id)) {
+                                            localCat.software.push(s);
+                                        }
+                                    });
+                                } else {
+                                    // Add new category
+                                    merged.categories.push(shareCat);
+                                }
+                            });
+                            
+                            localStorage.setItem('boxy_data', JSON.stringify(merged));
+                            window.location.href = window.location.pathname; // Reload to apply
+                        }
+                    }} className="px-3 py-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded text-xs font-bold transition-colors shadow-sm">一键导入合并</button>
+                </div>
+            </div>
+        )}
+
         <main className="flex-1 overflow-y-auto bg-[#fafafa] p-6 relative">
           <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -454,7 +599,8 @@ export default function App() {
                     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
                     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`; a.click();
                 }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
-                <button onClick={() => setModals({...modals, webdav: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="WebDAV 同步"><Cloud size={18} /></button>
+                <button onClick={handleShareAll} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="分享整个库"><Share2 size={18} /></button>
+                <button onClick={() => setModals({...modals, settings: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="设置 & 同步"><Settings size={18} /></button>
                 <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
                     if(!e.target.files[0]) return;
                     if(!confirm('导入数据将覆盖当前所有数据，建议先导出备份！\n是否继续？')) { e.target.value = ''; return; }
@@ -522,6 +668,9 @@ export default function App() {
                                     <button disabled={!soft.blogUrls?.[0]} onClick={(e) => { e.stopPropagation(); window.open(soft.blogUrls[0], '_blank', 'noopener,noreferrer'); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 px-2 py-1 rounded hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-default" data-tip={soft.blogUrls?.[0] ? '查看教程' : '无教程链接'}>
                                         <BookOpen  size={14} /> <span className="font-medium">{soft.blogUrls?.length || 0}</span>
                                     </button>
+                                    <button onClick={(e) => { e.stopPropagation(); setShareSoft(soft); setModals({...modals, share: true}); }} className="tooltip-wrap flex items-center gap-1.5 text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded hover:bg-purple-50 transition-colors" data-tip="分享软件">
+                                        <Share2 size={14} />
+                                    </button>
                                 </div>
                             </div>
                         </SortableItem>
@@ -538,12 +687,13 @@ export default function App() {
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none animate-modal-in"><div className={`px-4 py-2 rounded-full shadow-lg text-sm font-medium text-white flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-black'}`}>{toast.type==='error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />} {toast.msg}</div></div>}
 
       {/* Modals */}
-      {modals.webdav && (
-        <WebDavModal 
+      {modals.settings && (
+        <SettingsModal 
             config={wdConfig} 
             setConfig={setWdConfig} 
             onSync={(type) => handleWebDav(type)} 
-            onClose={() => setModals({...modals, webdav: false})} 
+            onClose={() => setModals({...modals, settings: false})} 
+            onUpdateRepo={handleUpdateRepo}
         />
       )}
       
@@ -563,6 +713,14 @@ export default function App() {
             onSave={handleSaveSoftware}
             onDelete={handleDeleteSoftware}
             onClose={() => setModals({...modals, software: false})} 
+            showToast={showToast}
+        />
+      )}
+
+      {modals.share && shareSoft && (
+        <ShareModal 
+            soft={shareSoft} 
+            onClose={() => setModals({...modals, share: false})} 
             showToast={showToast}
         />
       )}

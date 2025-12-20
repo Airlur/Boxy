@@ -1,0 +1,135 @@
+import React, { useState } from 'react';
+import { X, Copy, Link, FileJson } from 'lucide-react';
+
+export function ShareModal({ soft, onClose, showToast }) {
+    const [loading, setLoading] = useState(false);
+    const [shareUrl, setShareUrl] = useState('');
+
+    const handleCopy = (text, type) => {
+        navigator.clipboard.writeText(text);
+        showToast(`已复制 ${type}`);
+    };
+
+    const generateLink = async () => {
+        setLoading(true);
+        try {
+            // 构造一个只包含该软件数据的 JSON
+            // 为了兼容导入逻辑，我们包装成 standard format
+            const payload = {
+                categories: [{
+                    id: 'share_temp',
+                    name: '分享导入',
+                    sort: 0,
+                    software: [soft]
+                }],
+                updatedAt: Date.now()
+            };
+
+            const res = await fetch('/api/gist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: JSON.stringify(payload, null, 2),
+                    description: `Boxy Share: ${soft.name}`
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            const link = `${window.location.origin}/?share=${data.id}`;
+            setShareUrl(link);
+            handleCopy(link, '分享链接');
+        } catch (e) {
+            console.error(e);
+            showToast(`生成失败: ${e.message}`, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const textShare = `推荐软件：${soft.name}\n官网：${soft.website || '无'}\n${soft.description || ''}`;
+    const jsonShare = JSON.stringify(soft, null, 2);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm dialog-backdrop" onClick={onClose}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm border border-gray-100 relative z-10 animate-modal-in p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg">分享软件</h3>
+                    <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-black"/></button>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg mb-6 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded bg-white border border-gray-200 flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden">
+                        {(() => {
+                            const domain = (() => {
+                                try { if (soft.website) return new URL(soft.website).hostname; } catch(e){}
+                                if (!domain && soft.downloadUrls?.[0]) try { return new URL(soft.downloadUrls[0]).hostname; } catch(e){}
+                                return '';
+                            })();
+                            
+                            const proxyUrl = domain ? `/api/favicon?domain=${domain}` : null;
+                            const googleUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+                            const initialSrc = soft.iconUrl || proxyUrl;
+                            const firstChar = soft.name.charAt(0).toUpperCase();
+
+                            return initialSrc ? (
+                                <img 
+                                    src={initialSrc} 
+                                    className="w-full h-full object-contain p-1" 
+                                    onError={(e) => {
+                                        if (soft.iconUrl && e.target.src.includes(soft.iconUrl) && proxyUrl) {
+                                            e.target.src = proxyUrl;
+                                            return;
+                                        }
+                                        if (e.target.src.includes('/api/favicon') && googleUrl) {
+                                            e.target.src = googleUrl;
+                                            return;
+                                        }
+                                        e.target.style.display = 'none';
+                                        e.target.parentElement.innerText = firstChar;
+                                    }}
+                                />
+                            ) : firstChar;
+                        })()}
+                    </div>
+                    <div>
+                        <div className="font-bold">{soft.name}</div>
+                        <div className="text-xs text-gray-500 line-clamp-2">{soft.description}</div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <button onClick={generateLink} disabled={loading} className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors disabled:opacity-50">
+                        {loading ? <RotateCw size={16} className="animate-spin"/> : <Link size={16}/>}
+                        {shareUrl ? '链接已生成 (点击复制)' : '生成分享链接'}
+                    </button>
+                    
+                    {shareUrl && (
+                        <input 
+                            readOnly 
+                            value={shareUrl} 
+                            onClick={(e) => { e.target.select(); handleCopy(shareUrl, '链接'); }}
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded text-xs text-gray-600 outline-none text-center"
+                        />
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => handleCopy(textShare, '推荐语')} className="flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                            <Copy size={14}/> 复制推荐语
+                        </button>
+                        <button onClick={() => handleCopy(jsonShare, 'JSON')} className="flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                            <FileJson size={14}/> 复制 JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Helper icon
+function RotateCw({size, className}) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>;
+}
