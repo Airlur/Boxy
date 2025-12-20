@@ -2,21 +2,23 @@
 
 Boxy 是一款轻量级的个人应用管理导航工具，旨在帮助你高效地收藏、整理和查找各类软件及应用程序。通过直观的界面和便捷的拖拽操作，你可以轻松管理你收藏的宝藏软件，并支持 WebDAV 同步，确保数据安全与便捷。
 
-## ✨ 主要特性
+## ✨ 主要功能
 
-*   **应用与分类管理**: 创建、编辑、删除应用和分类，构建清晰的管理结构。
-*   **拖拽排序**: 通过拖拽即可调整分类和应用的位置，实现个性化布局。
-*   **快速搜索**: 实时搜索功能，帮助你迅速找到目标应用。
-*   **数据导入/导出**: 支持 JSON 格式的数据备份与恢复。
-*   **WebDAV 同步**: 无缝对接 WebDAV 服务，将你的应用数据同步到云端，多设备访问无忧，确保数据永不丢失。
-*   **智能图标获取**: 优化应用图标的加载逻辑，提供多级降级策略（代理 API -> Google 直连 -> 文字首字母），确保在不同网络环境下（尤其是在网络受限区域）也能稳定显示图标。
+*   **应用与分类管理**：创建、编辑、删除应用和分类，构建清晰的管理结构。
+*   **拖拽排序**：通过拖拽即可调整分类和应用的位置，实现个性化布局。
+*   **快速搜索**：实时搜索功能，帮助你迅速找到目标应用。
+*   **数据导入/导出**：支持 JSON 格式的数据备份与恢复。
+*   **WebDAV 同步**：无缝对接 WebDAV 服务，将你的应用数据同步到云端，多设备访问无忧。
+*   **智能图标获取**：支持自定义图标URL或上传图片 (自动转 Base64)、代理 API 获取、Google Favicon 降级等多级策略。
+*   **数据分享**：一键生成 Gist 分享链接，支持预览模式和智能合并导入。
+*   **仓库管理**：站长可在线将当前数据回写到 GitHub 仓库，更新初始推荐列表。
 
 ## 🛠️ 技术栈
 
-*   **前端**: React, Vite, TailwindCSS
-*   **UI 组件**: Lucide Icons
-*   **拖拽库**: Dnd-kit
-*   **后端 (Serverless Functions)**: Vercel Serverless Functions (Node.js) / Cloudflare Pages Functions (Edge Runtime)
+*   **前端**：React, Vite, TailwindCSS
+*   **UI 组件**：Lucide Icons
+*   **拖拽库**：Dnd-kit
+*   **后端 (Serverless Functions)**：Vercel Serverless Functions (Node.js) / Cloudflare Pages Functions (Edge Runtime)
 
 ## 🚀 快速开始 (本地开发)
 
@@ -45,17 +47,41 @@ Boxy 是一款轻量级的个人应用管理导航工具，旨在帮助你高效
 Boxy 支持通过 WebDAV 协议将你的数据同步到云端，实现多设备间的数据共享与备份。
 
 ### 配置说明
-1.  **服务器地址**: 输入完整的 WebDAV 地址，例如 `https://dav.jianguoyun.com/dav/` 或 `https://zeze.teracloud.jp/dav/`。
-2.  **账号密码**: 
+1.  **服务器地址**：输入完整的 WebDAV 地址，例如 `https://dav.jianguoyun.com/dav/` 或 `https://zeze.teracloud.jp/dav/`。
+2.  **账号密码**：
     *   使用 **应用密码 (App Password)** 而非账号登录密码。
 3.  **自动同步**:
     *   开启后，Boxy 会在启动时尝试拉取云端最新数据。
     *   当你修改数据（添加、排序、删除）并停止操作 2 秒后，Boxy 会自动将变更推送到云端。
-    *   *注意：开启自动同步必须勾选“记住密码”。*
+    *   注意：开启自动同步会自动勾选“记住密码”。
 
-## 部署
+## 📢 分享与管理
 
-Boxy 支持部署到 Vercel 或 Cloudflare Pages 等平台。
+### 数据分享 (Gist 快照)
+你可以一键生成当前数据的 **分享链接** (基于 GitHub Gist)，发送给朋友或在社区分享。
+*   **预览模式**：访问分享链接的用户将进入只读预览模式，并支持一键合并导入到他们的本地库。
+*   **无需鉴权**：分享功能默认使用匿名 Gist，需要站长配置 Token，普通用户无需任何配置。
+
+### 站长功能：更新仓库初始数据
+如果你是网站部署者，你可以在设置中通过 **“仓库管理”** 功能，将当前网页上的最新数据回写到 GitHub 仓库的 `initialData.json`。这样，新访问的用户将直接看到你推荐的最新列表。
+
+**启用此功能需在 Vercel/Cloudflare 后台配置环境变量：**
+*   `GITHUB_TOKEN`：具有 `repo` 和 `gist` 权限的 Token，例如 `ghp_xxxxx`。
+*   `GITHUB_REPO`：你的仓库地址，不需要GitHub的域名，例如 `Airlur/boxy`。
+*   `ADMIN_PASSWORD`：自定义的管理员密码，例如 `123456` 。
+
+`GITHUB_TOKEN` 的创建步骤：
+ + 打开 https://github.com/settings/tokens ，点击Generate new token，选择 Generate new token(classic)
+ + Note 输入 Boxy Admin Token
+ + Expiration (过期时间)：建议选 1 年或选 "No expiration" (永不过期)。如果过期了你的“更新仓库”功能无法使用，需要重新配置。
+ + Select scopes (权限范围):
+   + repo：(Full control of private repositories) —— 必须勾选。
+   + gist：(Create gists) —— 必须勾选。
+   + 其他都不需要。
+
+## ⚙️ 部署
+
+Boxy 支持部署到 Vercel 或 Cloudflare Pages 。
 
 ### Vercel
 你可以在Vercel上一键部署自己的 Boxy 实例：
@@ -88,15 +114,22 @@ Boxy 支持部署到 Vercel 或 Cloudflare Pages 等平台。
 
 ## 📦 项目结构概览
 
-*   `public/`: 静态资源文件。
-*   `src/`: 前端 React 应用程序源代码。
-    *   `src/App.jsx`: 主要的应用组件，包含大部分业务逻辑和 UI。
-    *   `src/data/initialData.js`: 提供一些软件的JSON数据。
-    *   `src/index.css`: TailwindCSS 样式入口。
-*   `api/`: (Vercel) Serverless Functions 的存放目录，例如 `api/webdav.js`, `api/favicon.js`。
-*   `functions/api/`: (Cloudflare Pages) Edge Functions 的存放目录，例如 `functions/api/webdav.js`, `functions/api/favicon.js`。
-*   `vite.config.js`: Vite 配置。
-*   `tailwind.config.js`: TailwindCSS 配置。
+*   `public/`：静态资源文件。
+*   `api/`：(Vercel) Serverless Functions。
+    *   `webdav.js`, `favicon.js`
+    *   `gist.js` (分享功能), `update-repo.js` (仓库回写)
+*   `functions/api/`：(Cloudflare Pages) Edge Functions。
+    *   同上，对应 Cloudflare 运行环境。
+*   `src/`：前端 React 应用程序源代码。
+    *   `src/App.jsx`：主应用入口，包含核心状态管理。
+    *   `src/components/`：
+        *   `SortableItem.jsx`：拖拽包装组件。
+        *   `LinksInput.jsx`：动态链接输入框组件。
+        *   `modals/`：各类模态框组件 (`SettingsModal.jsx`, `ShareModal.jsx`, `SoftwareModal.jsx` 等)。
+    *   `src/data/initialData.json`：初始化数据源。
+    *   `src/index.css`：TailwindCSS 样式。
+*   `vite.config.js`：Vite 配置 (包含本地 API Mock)。
+*   `tailwind.config.js`：TailwindCSS 配置。
 
 ## 🤝 贡献
 
