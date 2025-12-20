@@ -7,7 +7,7 @@ import {
 import { DndContext, closestCenter, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 
-import { initialData } from './data/initialData';
+import initialData from './data/initialData';
 import { SortableItem } from './components/SortableItem';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { CategoryModal } from './components/modals/CategoryModal';
