@@ -10,32 +10,59 @@ export function ShareModal({ soft, onClose, showToast }) {
         showToast(`已复制 ${type}`);
     };
 
+    const simpleHash = str => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash &= hash;
+        }
+        return new Uint32Array([hash])[0].toString(36);
+    };
+
     const generateLink = async () => {
         setLoading(true);
         try {
-            // 构造一个只包含该软件数据的 JSON
-            // 为了兼容导入逻辑，我们包装成 standard format
+            // 保留原始分类，移除 updatedAt 以保持 Hash 稳定
             const payload = {
                 categories: [{
-                    id: 'share_temp',
-                    name: '分享导入',
+                    id: soft._catId || 'share_default',
+                    name: soft._catName || '分享软件',
                     sort: 0,
                     software: [soft]
-                }],
-                updatedAt: Date.now()
+                }]
             };
+
+            const content = JSON.stringify(payload, null, 2);
+            const contentHash = simpleHash(content);
+            
+            // 检查本地缓存
+            const cacheKey = 'boxy_share_cache';
+            const cache = JSON.parse(localStorage.getItem(cacheKey) || '{}');
+            
+            if (cache[contentHash]) {
+                const link = `${window.location.origin}/?share=${cache[contentHash]}`;
+                setShareUrl(link);
+                handleCopy(link, '分享链接 (来自缓存)');
+                setLoading(false);
+                return;
+            }
 
             const res = await fetch('/api/gist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    content: JSON.stringify(payload, null, 2),
+                    content: content,
                     description: `Boxy Share: ${soft.name}`
                 })
             });
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
+
+            // 更新缓存
+            cache[contentHash] = data.id;
+            localStorage.setItem(cacheKey, JSON.stringify(cache));
 
             const link = `${window.location.origin}/?share=${data.id}`;
             setShareUrl(link);

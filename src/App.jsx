@@ -368,7 +368,7 @@ export default function App() {
       id: fd.get('id') || 's_' + Date.now(),
       name: fd.get('name'),
       website: fd.get('website'),
-      iconUrl: fd.get('iconUrl'), // 新增字段
+      iconUrl: fd.get('iconUrl'),
       description: fd.get('description'),
       downloadUrls: fd.getAll('dl-inputs[]').map(v => v.trim()).filter(Boolean),
       blogUrls: fd.getAll('blog-inputs[]').map(v => v.trim()).filter(Boolean),
@@ -377,6 +377,42 @@ export default function App() {
 
     if(!newSoft.name) return showToast('请输入名称', 'error');
 
+    const targetCatId = fd.get('categoryId');
+
+    // --- 预览模式：保存到本地 ---
+    if (isPreviewMode) {
+        const localData = JSON.parse(localStorage.getItem('boxy_data') || JSON.stringify(initialData));
+        const merged = { ...localData, updatedAt: Date.now() };
+        
+        // 获取预览数据中的分类名称 (用于在本地匹配或创建)
+        const previewCat = data.categories.find(c => c.id === targetCatId);
+        const catName = previewCat ? previewCat.name : '导入';
+
+        // 在本地查找匹配的分类 (优先 ID，其次名称)
+        let targetCat = merged.categories.find(c => c.id === targetCatId) || merged.categories.find(c => c.name === catName);
+        
+        if (!targetCat) {
+            // 新建分类
+            targetCat = { id: targetCatId, name: catName, sort: 99, software: [] };
+            merged.categories.push(targetCat);
+        }
+
+        // 检查重复 (ID)
+        const existingIdx = targetCat.software.findIndex(s => s.id === newSoft.id);
+        if (existingIdx > -1) {
+            if(!confirm('本地已存在同名软件，是否覆盖？')) return;
+            targetCat.software[existingIdx] = newSoft;
+        } else {
+            targetCat.software.push(newSoft);
+        }
+
+        localStorage.setItem('boxy_data', JSON.stringify(merged));
+        setModals({ ...modals, software: false });
+        showToast('已保存到本地库');
+        return;
+    }
+
+    // --- 正常模式 ---
     let newCats = [...data.categories];
     // Remove old if editing
     if (fd.get('id')) {
@@ -390,7 +426,7 @@ export default function App() {
     }
     
     // 添加到新类别
-    const targetCat = newCats.find(c => c.id === fd.get('categoryId'));
+    const targetCat = newCats.find(c => c.id === targetCatId);
     if(targetCat) {
         targetCat.software.push(newSoft);
     } else {

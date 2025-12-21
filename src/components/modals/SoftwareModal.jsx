@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Trash, Upload } from 'lucide-react';
 import { LinksInput } from '../LinksInput';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export function SoftwareModal({ editingSoft, categories, currentCategory, onSave, onDelete, onClose, showToast }) {
-    
+    const defaultCatId = editingSoft ? editingSoft._catId : (currentCategory !== 'all' ? currentCategory : categories[0]?.id);
+    const [categoryId, setCategoryId] = useState(defaultCatId);
+
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -50,7 +59,7 @@ export function SoftwareModal({ editingSoft, categories, currentCategory, onSave
                 
                 const base64 = canvas.toDataURL('image/png', 0.8);
                 
-                // 3. 转换后大小警告 (base64字符串长度>30000，对应实际文件大小 ≈ 22KB)
+                // 3. 转换后大小警告(base64字符串长度>30000，对应实际文件大小 ≈ 22KB) 
                 if (base64.length > 30000) {
                     showToast('图标文件较大，可能会影响同步速度', 'info');
                 }
@@ -58,7 +67,6 @@ export function SoftwareModal({ editingSoft, categories, currentCategory, onSave
                 const input = document.getElementById('iconUrlInput');
                 if (input) {
                     input.value = base64;
-                    // 触发 React 可能需要的事件（虽然目前非受控，但是个好习惯）
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 showToast('图标已转换并填入');
@@ -87,9 +95,17 @@ export function SoftwareModal({ editingSoft, categories, currentCategory, onSave
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1.5">分类</label>
-                                <select name="categoryId" defaultValue={editingSoft ? editingSoft._catId : (currentCategory !== 'all' ? currentCategory : categories[0]?.id)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-black">
-                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <input type="hidden" name="categoryId" value={categoryId} />
+                                <Select value={categoryId} onValueChange={setCategoryId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="选择分类" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categories.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
