@@ -167,10 +167,10 @@ export function SettingsModal({
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pt-2">
-                      <button onClick={() => onSync('pull')} className="flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 hover:border-gray-900 rounded-xl text-sm font-bold transition-all text-gray-600 hover:text-black">
+                      <button onClick={() => onSync('pull')} className="flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors text-blue-600">
                         <CloudDownload size={16}/> 立即拉取
                       </button>
-                      <button onClick={() => onSync('push')} className="flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-xl hover:bg-gray-800 text-sm font-bold transition-all shadow-lg shadow-black/5">
+                      <button onClick={() => onSync('push')} className="flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-all shadow-lg shadow-black/5">
                         <CloudUpload size={16}/> 立即推送
                       </button>
                     </div>
