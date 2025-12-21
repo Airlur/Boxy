@@ -37,15 +37,46 @@ export default function App() {
   // 1. 全局提示
   const { toast, showToast } = useToast();
 
-  // 2. 自动同步逻辑 (通过 Ref 解决闭包问题)
-  const autoSyncTimer = useRef(null);
-  const triggerAutoSyncRef = useRef((newData) => {});
+  // 2. 自动同步逻辑 (带倒计时 UI)
+  const [syncCountdown, setSyncCountdown] = useState(0);
+  const syncTimerRef = useRef(null);
+  const syncTargetTimeRef = useRef(0);
+  const triggerSyncFuncRef = useRef(null); // 保存最新的同步函数
 
+  // 4. WebDAV 管理
+  const { 
+    wdConfig, setWdConfig, syncStatus, setSyncStatus,
+    handleWebDav, handleUpdateRepo, handleTestConnection,
+    backups, fetchBackups, handleRestore, handleDeleteBackup
+  } = useWebDAV(showToast, (d, s) => innerSaveData(d, s), setModals);
+
+  // 启动倒计时
   const handleAutoSyncTrigger = (newData) => {
-    if (autoSyncTimer.current) clearTimeout(autoSyncTimer.current);
-    autoSyncTimer.current = setTimeout(() => {
-        triggerAutoSyncRef.current(newData);
-    }, 2000);
+    // 立即进入等待状态 (打断之前的成功/错误提示)
+    setSyncStatus('waiting');
+    
+    // 1. 清除旧定时器
+    if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+    
+    const delay = wdConfig.syncDelay || 2;
+    // 2. 设定目标时间
+    syncTargetTimeRef.current = Date.now() + (delay * 1000);
+    setSyncCountdown(delay);
+
+    // 3. 启动 interval 每 100ms 检查一次
+    syncTimerRef.current = setInterval(() => {
+      const remain = Math.ceil((syncTargetTimeRef.current - Date.now()) / 1000);
+      
+      if (remain <= 0) {
+        clearInterval(syncTimerRef.current);
+        setSyncCountdown(0);
+        if (triggerSyncFuncRef.current) {
+           triggerSyncFuncRef.current(newData);
+        }
+      } else {
+        setSyncCountdown(remain);
+      }
+    }, 100);
   };
 
   // 3. 数据管理
@@ -56,21 +87,21 @@ export default function App() {
     handleImportMerge, handleImportSingle
   } = useData(showToast, false, handleAutoSyncTrigger); 
 
-  // 4. WebDAV 管理
-  const { 
-    wdConfig, setWdConfig, isSyncing, 
-    handleWebDav, handleUpdateRepo 
-  } = useWebDAV(showToast, innerSaveData, setModals);
-
-  // 更新 Ref 以指向最新的 handleWebDav 和 wdConfig
+  // 更新 Ref 以指向最新的 handleWebDav (解决闭包过时问题)
   useEffect(() => {
-    triggerAutoSyncRef.current = (newData) => {
+    triggerSyncFuncRef.current = (newData) => {
       if (wdConfig.autoSync && wdConfig.url) {
-        console.log(`[${new Date().toLocaleString()}] 正在触发自动同步推送...`);
         handleWebDav('push', newData, true, wdConfig);
       }
     };
   }, [wdConfig, handleWebDav]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+       if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+    };
+  }, []);
 
   // 5. 预览模式
   const { isPreviewMode } = usePreviewMode(setData, showToast);
@@ -85,8 +116,8 @@ export default function App() {
   // 包装 saveData (添加预览模式检查)
   const saveData = (newData, skipAutoSync) => {
     if (isPreviewMode) {
-        showToast('预览模式无法保存修改', 'error');
-        return;
+      showToast('预览模式无法保存修改', 'error');
+      return;
     }
     innerSaveData(newData, skipAutoSync);
   };
@@ -102,13 +133,21 @@ export default function App() {
 
   // --- Effects ---
 
-  // 初始 WebDAV Pull
+  // 初始 WebDAV Pull (仅在组件挂载且有已保存配置时执行一次)
   useEffect(() => {
-    if (!isPreviewMode && wdConfig.autoSync && wdConfig.url && wdConfig.user) {
-        handleWebDav('pull', data, true, wdConfig);
+    // 检查本地是否有已保存的配置
+    const saved = localStorage.getItem('boxy_webdav_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!isPreviewMode && parsed.autoSync && parsed.url && parsed.user) {
+           // 使用 parsed 的配置进行首次拉取，而不是依赖 wdConfig 状态
+           handleWebDav('pull', data, true, parsed);
+        }
+      } catch (e) {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wdConfig.url, wdConfig.user]);
+  }, []); // 依赖项置空，只运行一次
 
   // --- 辅助函数 ---
   const getDomain = (soft) => {
@@ -145,37 +184,38 @@ export default function App() {
 
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <Header 
-            isSidebarOpen={isSidebarOpen}
-            setIsSidebarOpen={setIsSidebarOpen}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            wdConfig={wdConfig}
-            isSyncing={isSyncing}
-            data={data}
-            setModals={setModals}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          wdConfig={wdConfig}
+          syncStatus={syncStatus}
+          syncCountdown={syncCountdown}
+          data={data}
+          setModals={setModals}
         />
         
         <SoftwareGrid 
-            data={data}
-            currentCategory={currentCategory}
-            searchQuery={searchQuery}
-            countTotal={countTotal}
-            displayedItems={displayedItems}
-            sensors={sensors}
-            handleDragEnd={handleDragEnd}
-            setEditingCat={setEditingCat}
-            setModals={setModals}
-            saveData={saveData}
-            wdConfig={wdConfig}
-            isPreviewMode={isPreviewMode}
-            onExitPreview={() => window.location.href = window.location.pathname}
-            onImportMerge={handleImportMerge}
-            onImportSingle={handleImportSingle}
-            setEditingSoft={setEditingSoft}
-            setShareSoft={setShareSoft}
-            showToast={showToast}
-            getDomain={getDomain}
-            handleSaveSoftware={(e) => handleSaveSoftware(e, modals, setModals)}
+          data={data}
+          currentCategory={currentCategory}
+          searchQuery={searchQuery}
+          countTotal={countTotal}
+          displayedItems={displayedItems}
+          sensors={sensors}
+          handleDragEnd={handleDragEnd}
+          setEditingCat={setEditingCat}
+          setModals={setModals}
+          saveData={saveData}
+          wdConfig={wdConfig}
+          isPreviewMode={isPreviewMode}
+          onExitPreview={() => window.location.href = window.location.pathname}
+          onImportMerge={handleImportMerge}
+          onImportSingle={handleImportSingle}
+          setEditingSoft={setEditingSoft}
+          setShareSoft={setShareSoft}
+          showToast={showToast}
+          getDomain={getDomain}
+          handleSaveSoftware={(e) => handleSaveSoftware(e, modals, setModals)}
         />
       </div>
 
@@ -184,8 +224,14 @@ export default function App() {
         setModals={setModals}
         wdConfig={wdConfig}
         setWdConfig={setWdConfig}
+        syncStatus={syncStatus}
         handleWebDav={(type, silent) => handleWebDav(type, data, silent)}
         handleUpdateRepo={() => handleUpdateRepo(data)}
+        handleTestConnection={handleTestConnection}
+        backups={backups}
+        fetchBackups={fetchBackups}
+        handleRestore={handleRestore}
+        handleDeleteBackup={handleDeleteBackup}
         editingCat={editingCat}
         handleSaveCategory={(name) => handleSaveCategory(name, editingCat, modals, setModals)}
         editingSoft={editingSoft}
@@ -200,9 +246,9 @@ export default function App() {
       {/* 全局 Toast 提示 */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none animate-modal-in">
-            <div className={`px-4 py-2 rounded-full shadow-lg text-sm font-medium text-white flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-500' : 'bg-black'}`}>
-                {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />} {toast.msg}
-            </div>
+          <div className={`px-4 py-2 rounded-full shadow-lg text-sm font-medium text-white flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-500' : 'bg-black'}`}>
+            {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />} {toast.msg}
+          </div>
         </div>
       )}
     </div>

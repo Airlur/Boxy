@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { endpoint, username, password, method = 'GET', data } = req.body;
+  const { endpoint, username, password, method = 'GET', data, destination } = req.body;
 
   if (!endpoint || !username || !password) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -13,27 +13,56 @@ export default async function handler(req, res) {
   try {
     const headers = {
       'Authorization': 'Basic ' + Buffer.from(username + ':' + password).toString('base64'),
-      'Content-Type': 'application/json'
+      // 关键修复：添加 User-Agent，防止被 TeraCloud 等防火墙拦截
+      'User-Agent': 'Boxy-WebDAV-Client/1.0',
     };
 
-    const options = {
-      method,
-      headers,
-      body: method === 'PUT' ? JSON.stringify(data) : undefined,
-    };
-
-    const response = await fetch(endpoint, options);
-
-    if (!response.ok) {
-      // 透传上游 WebDAV 的错误状态码
-      return res.status(response.status).json({ error: response.statusText });
+    // COPY 方法必须包含 Destination 头
+    if (destination) {
+      headers['Destination'] = destination;
+      headers['Overwrite'] = 'T';
     }
 
-    if (method === 'GET') {
-      const json = await response.json();
-      return res.status(200).json(json);
+    let body;
+    if (method === 'PUT') {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(data);
+    } else if (method === 'PROPFIND') {
+      headers['Depth'] = '1';
+      // 注意：PROPFIND 不发送 Content-Type，除非有 body
+    }
+    // COPY, GET, DELETE, MKCOL 通常不需要 Content-Type 和 Body
+
+    const options = { method, headers, body };
+    
+    // 调试日志 (服务端控制台可见)
+    // console.log(`[Proxy] ${method} ${endpoint}`, destination ? `-> ${destination}` : '');
+
+    const response = await fetch(endpoint, options);
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      // 尝试返回更详细的上游错误信息
+      try {
+        const errorJson = JSON.parse(responseText);
+        return res.status(response.status).json(errorJson);
+      } catch (e) {
+        return res.status(response.status).json({ 
+          error: response.statusText, 
+          details: responseText.substring(0, 200) // 截取部分错误详情
+        });
+      }
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        return res.status(200).json(JSON.parse(responseText));
+      } catch (e) {
+        return res.status(200).json({});
+      }
     } else {
-      return res.status(200).json({ success: true });
+      return res.status(200).send(responseText);
     }
 
   } catch (error) {

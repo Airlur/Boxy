@@ -18,35 +18,56 @@ const localApiMock = () => ({
         try {
           // --- 1. WebDAV Proxy ---
           if (req.url.startsWith('/api/webdav')) {
-            const { endpoint, username, password, method = 'GET', data } = JSON.parse(body);
+            const { endpoint, username, password, method = 'GET', data, destination } = JSON.parse(body);
             
-            // 伪装成 Chrome 浏览器
-            const cleanHeaders = {
+            const headers = {
               'Authorization': 'Basic ' + Buffer.from(username + ':' + password).toString('base64'),
-              'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': '*/*'
+              'User-Agent': 'Boxy-WebDAV-Client/1.0', // Align with production
             };
+
+            // Forward critical WebDAV headers
+            if (method === 'PROPFIND') headers['Depth'] = '1';
+            if (destination) {
+              headers['Destination'] = destination;
+              headers['Overwrite'] = 'T';
+            }
+            if (method === 'PUT') headers['Content-Type'] = 'application/json';
 
             const response = await fetch(endpoint, {
               method,
-              headers: cleanHeaders,
+              headers,
               body: method === 'PUT' ? JSON.stringify(data) : undefined
             });
 
             res.statusCode = response.status;
-            res.setHeader('Content-Type', 'application/json');
             
+            // Handle content type
+            const contentType = response.headers.get('content-type') || '';
+            res.setHeader('Content-Type', contentType.includes('application/json') ? 'application/json' : 'text/plain');
+
             if (!response.ok) {
-              res.end(JSON.stringify({ error: response.statusText }));
+              // Try to read error body
+              const errText = await response.text();
+              let errJson;
+              try { errJson = JSON.parse(errText); } catch(e) {}
+              
+              res.end(JSON.stringify(errJson || { error: response.statusText, details: errText }));
               return;
             }
 
-            if (method === 'GET') {
-              const json = await response.json();
-              res.end(JSON.stringify(json));
+            // Return body based on content type
+            const text = await response.text();
+            if (contentType.includes('application/json')) {
+              res.end(text);
             } else {
-              res.end(JSON.stringify({ success: true }));
+              // For PROPFIND (XML) or others, return raw text but wrapped in JSON if client expects it?
+              // The client (useWebDAV) expects: result.json OR result.text
+              // So we just send raw body, and client fetch handles it?
+              // No, the client calls fetch('/api/webdav'). 
+              // If we send raw XML, client res.json() will fail if it expects JSON wrapper.
+              // useWebDAV.js: const contentType = res.headers.get('content-type'); if (json) ... else result.text = await res.text();
+              // So we can just send the raw text from upstream.
+              res.end(text);
             }
             return;
           }

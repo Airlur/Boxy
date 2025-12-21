@@ -49,6 +49,18 @@ body {
     z-index: 50;
 }
 
+/* Tooltip Left Variant */
+.tooltip-left { position: relative; }
+.tooltip-left:hover::after {
+    bottom: auto;
+    left: auto;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    margin-bottom: 0;
+    margin-right: 8px;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

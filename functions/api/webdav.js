@@ -7,35 +7,53 @@ export async function onRequest(context) {
   }
 
   try {
-    const { endpoint, username, password, method = 'GET', data } = await request.json();
+    const bodyText = await request.text();
+    const { endpoint, username, password, method = 'GET', data, destination } = JSON.parse(bodyText);
 
     if (!endpoint || !username || !password) {
         return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400 });
     }
 
-    // Cloudflare Edge 环境使用 btoa
     const auth = btoa(username + ':' + password);
     
     const headers = {
       'Authorization': 'Basic ' + auth,
-      'Content-Type': 'application/json',
       'User-Agent': 'Boxy-Proxy/1.0'
     };
+
+    if (destination) {
+      headers['Destination'] = destination;
+      headers['Overwrite'] = 'T';
+    }
+
+    let fetchBody;
+    if (method === 'PUT') {
+      headers['Content-Type'] = 'application/json';
+      fetchBody = JSON.stringify(data);
+    } else if (method === 'PROPFIND') {
+      headers['Depth'] = '1';
+    }
 
     const upstreamResponse = await fetch(endpoint, {
       method,
       headers,
-      body: method === 'PUT' ? JSON.stringify(data) : undefined,
+      body: fetchBody,
     });
 
+    const responseText = await upstreamResponse.text();
+    
     if (!upstreamResponse.ok) {
-        return new Response(JSON.stringify({ error: upstreamResponse.statusText }), { status: upstreamResponse.status });
+        return new Response(JSON.stringify({ error: upstreamResponse.statusText, details: responseText }), { 
+            status: upstreamResponse.status,
+            headers: { "Content-Type": "application/json" }
+        });
     }
 
-    const body = method === 'GET' ? await upstreamResponse.text() : JSON.stringify({ success: true });
-    
-    return new Response(body, {
-      headers: { "Content-Type": "application/json" },
+    const contentType = upstreamResponse.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+
+    return new Response(responseText, {
+      headers: { "Content-Type": isJson ? "application/json" : "application/xml" },
       status: 200
     });
 

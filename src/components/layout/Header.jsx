@@ -7,7 +7,8 @@ export function Header({
   searchQuery, 
   setSearchQuery, 
   wdConfig, 
-  isSyncing, 
+  syncStatus, // 修复：添加 syncStatus
+  syncCountdown, 
   data, 
   setModals
 }) {
@@ -42,14 +43,29 @@ export function Header({
 
       {/* 同步状态指示器 */}
       {wdConfig.autoSync && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-500">
-          {isSyncing ? (
-            <RotateCw size={12} className="animate-spin text-blue-500"/>
+        <button 
+          onClick={() => setModals(prev => ({ ...prev, settings: true }))}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-all active:scale-95 ${
+            syncStatus === 'syncing' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+            syncStatus === 'waiting' ? 'bg-amber-50 border-amber-100 text-amber-600' : 
+            syncStatus === 'success' ? 'bg-green-50 border-green-100 text-green-600' :
+            syncStatus === 'error' ? 'bg-red-50 border-red-100 text-red-600' :
+            'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          {syncStatus === 'syncing' ? (
+            <RotateCw size={12} className="animate-spin"/>
           ) : (
             <Cloud size={12} />
           )}
-          <span>{isSyncing ? '同步中...' : '已开启同步'}</span>
-        </div>
+          <span className="font-medium">
+            {syncStatus === 'syncing' ? '同步中...' : 
+             syncStatus === 'waiting' ? `${syncCountdown}秒后同步...` : 
+             syncStatus === 'success' ? '同步成功' :
+             syncStatus === 'error' ? '同步失败' :
+             '已开启同步'}
+          </span>
+        </button>
       )}
     </header>
   );
