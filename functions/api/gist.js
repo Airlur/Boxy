@@ -36,7 +36,7 @@ export async function onRequest(context) {
     const response = await fetch('https://api.github.com/gists', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${githubToken}`,
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'Boxy-App'
       },
