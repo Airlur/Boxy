@@ -55,6 +55,15 @@ Boxy 支持通过 WebDAV 协议将你的数据同步到云端，实现多设备�
     *   当你修改数据（添加、排序、删除）并停止操作 2 秒后，Boxy 会自动将变更推送到云端。
     *   注意：开启自动同步会自动勾选“记住密码”。
 
+### 💾 本地存储 (LocalStorage)
+Boxy 依赖浏览器的本地存储功能，主要键值说明如下：
+
+| Key | 说明 |
+| :--- | :--- |
+| `boxy_data` | 存储所有的分类、软件及排序数据 (JSON)。 |
+| `boxy_webdav_config` | 存储 WebDAV 的配置信息 (URL, 用户名, 密码等)。 |
+| `boxy_share_cache` | 缓存已生成的分享链接 (Gist ID)，避免短时间内重复创建。 |
+
 ## 📢 分享与管理
 
 ### 数据分享 (Gist 快照)
@@ -132,22 +141,39 @@ Boxy 支持部署到 Vercel 或 Cloudflare Pages 。
 
 ## 📦 项目结构概览
 
-*   `public/`：静态资源文件。
-*   `api/`：(Vercel) Serverless Functions。
-    *   `webdav.js`, `favicon.js`
-    *   `gist.js` (分享功能), `update-repo.js` (仓库回写)
-*   `functions/api/`：(Cloudflare Pages) Edge Functions。
-    *   同上，对应 Cloudflare 运行环境。
-*   `src/`：前端 React 应用程序源代码。
-    *   `src/App.jsx`：主应用入口，包含核心状态管理。
-    *   `src/components/`：
-        *   `SortableItem.jsx`：拖拽包装组件。
-        *   `LinksInput.jsx`：动态链接输入框组件。
-        *   `modals/`：各类模态框组件 (`SettingsModal.jsx`, `ShareModal.jsx`, `SoftwareModal.jsx` 等)。
-    *   `src/data/initialData.json`：初始化数据源。
-    *   `src/index.css`：TailwindCSS 样式。
-*   `vite.config.js`：Vite 配置 (包含本地 API Mock)。
-*   `tailwind.config.js`：TailwindCSS 配置。
+```
+boxy/
+├── public/                 # 静态资源目录 (Favicon 等)
+├── api/                    # Vercel Serverless Functions 目录
+│   ├── webdav.js           # WebDAV 代理服务
+│   ├── favicon.js          # 图标代理服务
+│   ├── gist.js             # Gist 分享功能服务
+│   └── update-repo.js      # 仓库回写更新服务
+├── functions/api/          # Cloudflare Pages Functions 目录 (Edge Runtime)
+│   └── ...                 # (文件功能同上，适配 CF 环境)
+├── src/                    # 前端源代码根目录
+│   ├── App.jsx             # 主应用入口组件 (Layout & Context 聚合)
+│   ├── index.css           # 全局样式 & Tailwind 引入
+│   ├── components/         # UI 组件库
+│   │   ├── layout/         # 布局组件 (Header, Sidebar, Grid)
+│   │   ├── modals/         # 业务弹窗 (Settings, Share, Software 等)
+│   │   ├── ui/             # 通用基础组件
+│   │   ├── SortableItem.jsx # dnd-kit 拖拽项包装器
+│   │   └── LinksInput.jsx  # 多链接动态输入组件
+│   ├── hooks/              # 自定义业务 Logic Hooks
+│   │   ├── useData.js      # 数据管理 (CRUD & LocalStorage)
+│   │   ├── useWebDAV.js    # WebDAV 同步逻辑
+│   │   ├── useSearch.js    # 搜索与过滤逻辑
+│   │   ├── useDragDrop.js  # 拖拽交互逻辑
+│   │   ├── useToast.js     # 全局消息提示
+│   │   └── usePreviewMode.js # 分享预览模式逻辑
+│   ├── data/               # 静态数据目录
+│   │   └── initialData.json # 应用初始默认数据
+│   └── lib/                # 工具函数目录
+├── .env                    # 环境变量配置文件 (本地开发)
+├── vite.config.js          # Vite 构建配置 (含本地 API Mock)
+└── tailwind.config.js      # TailwindCSS 样式配置
+```
 
 ## 🤝 贡献
 
