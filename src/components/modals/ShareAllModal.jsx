@@ -86,10 +86,16 @@ export function ShareAllModal({ data, onClose, showToast }) {
                 <div className="space-y-4">
                     {!shareUrl && (
                         <div className="flex justify-center">
-                            <Turnstile 
-                                sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY} 
-                                onVerify={setToken}
-                            />
+                            {import.meta.env.DEV ? (
+                                <button onClick={() => setToken('mock-turnstile-token')} className="px-4 py-2 bg-gray-200 rounded text-xs text-gray-600 hover:bg-gray-300">
+                                    [Dev] 点击模拟验证码通过
+                                </button>
+                            ) : (
+                                <Turnstile 
+                                    sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY} 
+                                    onVerify={setToken}
+                                />
+                            )}
                         </div>
                     )}
 
