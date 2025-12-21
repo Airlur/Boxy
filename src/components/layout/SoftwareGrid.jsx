@@ -135,7 +135,7 @@ export function SoftwareGrid({
               </button>
               <button 
                 onClick={() => setModals(prev => ({ ...prev, settings: true }))} 
-                className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`}
+                className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors"
                 data-tip="设置 & 同步"
               >
                 <Settings size={18} />

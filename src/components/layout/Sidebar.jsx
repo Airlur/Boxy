@@ -65,21 +65,13 @@ export function Sidebar({
           </DndContext>
         </div>
 
-        <div className="p-3 border-t border-gray-100 space-y-2">
+        <div className="p-3 border-t border-gray-100">
           <button 
             onClick={() => { setEditingCat(null); setModals(prev => ({...prev, category: true})); }} 
             className="w-full flex items-center justify-center gap-2 py-2 px-3 text-gray-500 hover:text-black hover:bg-gray-50 rounded-md transition-colors border border-dashed border-gray-300 hover:border-gray-400"
           >
             <Plus size={14} />
             <span>新增分类</span>
-          </button>
-
-          <button 
-            onClick={() => setModals(prev => ({ ...prev, settings: true }))}
-            className="w-full flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-black hover:bg-gray-50 rounded-md transition-colors group"
-          >
-            <Settings size={16} className="text-gray-400 group-hover:text-black" />
-            <span className="font-medium text-sm">设置</span>
           </button>
         </div>
       </aside>
