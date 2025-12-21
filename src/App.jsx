@@ -262,14 +262,37 @@ export default function App() {
     }
   };
 
-                <button onClick={() => {
-                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`; a.click();
-                }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
-                <button onClick={() => setModals({...modals, shareAll: true})} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="分享整个库"><Share2 size={18} /></button>
-                <button onClick={() => setModals({...modals, settings: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="设置 & 同步"><Settings size={18} /></button>
-                <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
+  // --- Admin: Update Repo ---
+  const handleUpdateRepo = async () => {
+      const pwd = prompt('请输入管理员密码 (ADMIN_PASSWORD):');
+      if (pwd === null) return;
 
+      const msg = prompt('请输入 Commit 信息:', 'chore: update initial data via admin panel');
+      if (msg === null) return;
+
+      showToast('正在更新仓库...', 'info');
+      try {
+          const res = await fetch('/api/update-repo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  content: JSON.stringify(data, null, 2),
+                  message: msg,
+                  password: pwd
+              })
+          });
+          
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error);
+          
+          showToast('仓库更新成功！部署即将触发');
+      } catch (e) {
+          console.error(e);
+          showToast(`更新失败: ${e.message}`, 'error');
+      }
+  };
+
+  // --- Drag & Drop ---
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -586,7 +609,7 @@ export default function App() {
                     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
                     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`; a.click();
                 }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
-                <button onClick={handleShareAll} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="分享整个库"><Share2 size={18} /></button>
+                <button onClick={() => setModals({...modals, shareAll: true})} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="分享整个库"><Share2 size={18} /></button>
                 <button onClick={() => setModals({...modals, settings: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="设置 & 同步"><Settings size={18} /></button>
                 <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
                     if(!e.target.files[0]) return;
