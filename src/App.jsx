@@ -265,19 +265,49 @@ export default function App() {
   const handleShareAll = async () => {
       if (!confirm('确定要生成当前所有数据的分享链接吗？\n(将创建匿名 Gist)')) return;
       
+      const simpleHash = str => {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = (hash << 5) - hash + char;
+              hash &= hash;
+          }
+          return new Uint32Array([hash])[0].toString(36);
+      };
+
+      // 构造去重 Payload (移除 updatedAt)
+      const { updatedAt, ...cleanData } = data;
+      const content = JSON.stringify(cleanData, null, 2);
+      const contentHash = simpleHash(content);
+
+      // 检查缓存
+      const cacheKey = 'boxy_share_cache';
+      const cache = JSON.parse(localStorage.getItem(cacheKey) || '{}');
+
+      if (cache[contentHash]) {
+          const link = `${window.location.origin}/?share=${cache[contentHash]}`;
+          navigator.clipboard.writeText(link);
+          showToast('链接已生成并复制！');
+          return;
+      }
+
       showToast('正在生成链接...', 'info');
       try {
           const res = await fetch('/api/gist', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                  content: JSON.stringify(data, null, 2),
+                  content: content,
                   description: 'Boxy Library Share'
               })
           });
           const result = await res.json();
           if (!res.ok) throw new Error(result.error);
           
+          // 更新缓存
+          cache[contentHash] = result.id;
+          localStorage.setItem(cacheKey, JSON.stringify(cache));
+
           const link = `${window.location.origin}/?share=${result.id}`;
           navigator.clipboard.writeText(link);
           showToast('链接已生成并复制！');
