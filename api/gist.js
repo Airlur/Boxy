@@ -3,11 +3,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { content, description } = req.body;
-  const token = process.env.GITHUB_TOKEN;
+  const { content, description, token: turnstileToken } = req.body;
+  const githubToken = process.env.GITHUB_TOKEN;
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
 
-  if (!token) {
-    return res.status(500).json({ error: 'Missing GITHUB_TOKEN' });
+  if (!githubToken || !turnstileSecret) {
+    return res.status(500).json({ error: 'Server config error' });
+  }
+
+  // Verify Turnstile
+  if (!turnstileToken) {
+      return res.status(403).json({ error: 'Missing captcha token' });
+  }
+
+  const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          secret: turnstileSecret,
+          response: turnstileToken
+      })
+  });
+  
+  const verifyData = await verifyRes.json();
+  if (!verifyData.success) {
+      return res.status(403).json({ error: 'Captcha verification failed' });
   }
 
   try {

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, Copy, Link, FileJson } from 'lucide-react';
+import Turnstile from 'react-turnstile';
 
 export function ShareModal({ soft, onClose, showToast }) {
     const [loading, setLoading] = useState(false);
     const [shareUrl, setShareUrl] = useState('');
+    const [token, setToken] = useState(null);
 
     const handleCopy = (text, type) => {
         navigator.clipboard.writeText(text);
@@ -21,6 +23,7 @@ export function ShareModal({ soft, onClose, showToast }) {
     };
 
     const generateLink = async () => {
+        if (!token) return;
         setLoading(true);
         try {
             // 保留原始分类，移除 updatedAt 以保持 Hash 稳定
@@ -53,7 +56,8 @@ export function ShareModal({ soft, onClose, showToast }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     content: content,
-                    description: `Boxy Share: ${soft.name}`
+                    description: `Boxy Share: ${soft.name}`,
+                    token: token
                 })
             });
 
@@ -128,9 +132,18 @@ export function ShareModal({ soft, onClose, showToast }) {
                 </div>
 
                 <div className="space-y-3">
-                    <button onClick={generateLink} disabled={loading} className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors disabled:opacity-50">
+                    {!shareUrl && (
+                        <div className="flex justify-center my-2">
+                            <Turnstile 
+                                sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                                onVerify={setToken}
+                            />
+                        </div>
+                    )}
+
+                    <button onClick={generateLink} disabled={loading || !token} className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                         {loading ? <RotateCw size={16} className="animate-spin"/> : <Link size={16}/>}
-                        {shareUrl ? '链接已生成 (点击复制)' : '生成分享链接'}
+                        {shareUrl ? '链接已生成 (点击复制)' : (token ? '生成分享链接' : '请先完成验证')}
                     </button>
                     
                     {shareUrl && (

@@ -13,6 +13,7 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { CategoryModal } from './components/modals/CategoryModal';
 import { SoftwareModal } from './components/modals/SoftwareModal';
 import { ShareModal } from './components/modals/ShareModal';
+import { ShareAllModal } from './components/modals/ShareAllModal';
 
 export default function App() {
   // --- State ---
@@ -22,7 +23,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Modals
-  const [modals, setModals] = useState({ software: false, category: false, settings: false, share: false });
+  const [modals, setModals] = useState({ software: false, category: false, settings: false, share: false, shareAll: false });
   const [editingSoft, setEditingSoft] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
   const [shareSoft, setShareSoft] = useState(null);
@@ -261,94 +262,14 @@ export default function App() {
     }
   };
 
-  // --- Share All ---
-  const handleShareAll = async () => {
-      if (!confirm('确定要生成当前所有数据的分享链接吗？\n(将创建匿名 Gist)')) return;
-      
-      const simpleHash = str => {
-          let hash = 0;
-          for (let i = 0; i < str.length; i++) {
-              const char = str.charCodeAt(i);
-              hash = (hash << 5) - hash + char;
-              hash &= hash;
-          }
-          return new Uint32Array([hash])[0].toString(36);
-      };
+                <button onClick={() => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `boxy_backup_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`; a.click();
+                }} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="导出备份"><Download size={18} /></button>
+                <button onClick={() => setModals({...modals, shareAll: true})} className="tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 hover:text-black transition-colors" data-tip="分享整个库"><Share2 size={18} /></button>
+                <button onClick={() => setModals({...modals, settings: true})} className={`tooltip-wrap w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors ${wdConfig.autoSync ? 'text-blue-600' : 'text-gray-700 hover:text-black'}`} data-tip="设置 & 同步"><Settings size={18} /></button>
+                <input type="file" id="json-import" className="hidden" accept=".json" onChange={(e) => {
 
-      // 构造去重 Payload (移除 updatedAt)
-      const { updatedAt, ...cleanData } = data;
-      const content = JSON.stringify(cleanData, null, 2);
-      const contentHash = simpleHash(content);
-
-      // 检查缓存
-      const cacheKey = 'boxy_share_cache';
-      const cache = JSON.parse(localStorage.getItem(cacheKey) || '{}');
-
-      if (cache[contentHash]) {
-          const link = `${window.location.origin}/?share=${cache[contentHash]}`;
-          navigator.clipboard.writeText(link);
-          showToast('链接已生成并复制！');
-          return;
-      }
-
-      showToast('正在生成链接...', 'info');
-      try {
-          const res = await fetch('/api/gist', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  content: content,
-                  description: 'Boxy Library Share'
-              })
-          });
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error);
-          
-          // 更新缓存
-          cache[contentHash] = result.id;
-          localStorage.setItem(cacheKey, JSON.stringify(cache));
-
-          const link = `${window.location.origin}/?share=${result.id}`;
-          navigator.clipboard.writeText(link);
-          showToast('链接已生成并复制！');
-      } catch (e) {
-          console.error(e);
-          showToast(`生成失败: ${e.message}`, 'error');
-      }
-  };
-
-  // --- Admin: Update Repo ---
-  const handleUpdateRepo = async () => {
-      const pwd = prompt('请输入管理员密码 (ADMIN_PASSWORD):');
-      if (pwd === null) return;
-
-      const msg = prompt('请输入 Commit 信息:', 'chore: update initial data via admin panel');
-      if (msg === null) return;
-
-      showToast('正在更新仓库...', 'info');
-      try {
-          const res = await fetch('/api/update-repo', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  content: JSON.stringify(data, null, 2),
-                  message: msg,
-                  password: pwd
-              })
-          });
-          
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error);
-          
-          showToast('仓库更新成功！部署即将触发');
-      } catch (e) {
-          console.error(e);
-          showToast(`更新失败: ${e.message}`, 'error');
-      }
-  };
-
-
-  // --- Drag & Drop ---
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -787,6 +708,14 @@ export default function App() {
         <ShareModal 
             soft={shareSoft} 
             onClose={() => setModals({...modals, share: false})} 
+            showToast={showToast}
+        />
+      )}
+
+      {modals.shareAll && (
+        <ShareAllModal 
+            data={data}
+            onClose={() => setModals({...modals, shareAll: false})} 
             showToast={showToast}
         />
       )}

@@ -6,11 +6,31 @@ export async function onRequest(context) {
   }
 
   try {
-    const { content, description } = await request.json();
-    const token = env.GITHUB_TOKEN;
+    const { content, description, token: turnstileToken } = await request.json();
+    const githubToken = env.GITHUB_TOKEN;
+    const turnstileSecret = env.TURNSTILE_SECRET_KEY;
 
-    if (!token) {
-        return new Response(JSON.stringify({ error: 'Missing GITHUB_TOKEN' }), { status: 500 });
+    if (!githubToken || !turnstileSecret) {
+        return new Response(JSON.stringify({ error: 'Server config error' }), { status: 500 });
+    }
+
+    // Verify Turnstile
+    if (!turnstileToken) {
+        return new Response(JSON.stringify({ error: 'Missing captcha token' }), { status: 403 });
+    }
+
+    const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            secret: turnstileSecret,
+            response: turnstileToken
+        })
+    });
+    
+    const verifyData = await verifyRes.json();
+    if (!verifyData.success) {
+        return new Response(JSON.stringify({ error: 'Captcha verification failed' }), { status: 403 });
     }
 
     const response = await fetch('https://api.github.com/gists', {
