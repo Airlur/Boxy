@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Menu, Search, X, RotateCw, Cloud } from 'lucide-react';
 
 export function Header({ 
@@ -12,6 +12,45 @@ export function Header({
   data, 
   setModals
 }) {
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const isEditableElement = (element) => {
+      if (!element) return false;
+      const tagName = element.tagName;
+      return (
+        element.isContentEditable ||
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT'
+      );
+    };
+
+    const handleSearchShortcut = (event) => {
+      const isSearchShortcut =
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'e';
+
+      if (!isSearchShortcut) return;
+
+      // Avoid hijacking shortcuts while typing in other form fields.
+      if (isEditableElement(event.target) && event.target !== searchInputRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.select();
+      }
+    };
+
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
+  }, []);
+
   return (
     <header className="h-14 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-10 gap-4">
       <button 
@@ -24,6 +63,7 @@ export function Header({
       <div className="flex-1 max-w-lg relative group">
         <Search size={16} className="text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input 
+          ref={searchInputRef}
           id="search-input"
           type="text" 
           placeholder="搜索软件 (Ctrl + E)" 
